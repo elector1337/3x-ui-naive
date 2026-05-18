@@ -12,16 +12,13 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-// NaiveController exposes REST endpoints for managing NaiveProxy servers
-// (CRUD + start/stop/status). Routes are mounted under /panel/api/naive.
 type NaiveController struct {
 	BaseController
-	naiveService *service.NaiveService
+	svc *service.NaiveService
 }
 
-// NewNaiveController wires routes and returns the controller.
 func NewNaiveController(g *gin.RouterGroup) *NaiveController {
-	a := &NaiveController{naiveService: service.GetNaiveService()}
+	a := &NaiveController{svc: service.GetNaiveService()}
 	a.initRouter(g)
 	return a
 }
@@ -38,8 +35,17 @@ func (a *NaiveController) initRouter(g *gin.RouterGroup) {
 	g.POST("/restart/:id", a.restart)
 }
 
+func parseID(c *gin.Context) (int, bool) {
+	id, err := strconv.Atoi(c.Param("id"))
+	if err != nil {
+		c.JSON(http.StatusBadRequest, entity.Msg{Success: false, Msg: "bad id"})
+		return 0, false
+	}
+	return id, true
+}
+
 func (a *NaiveController) list(c *gin.Context) {
-	rows, err := a.naiveService.List()
+	rows, err := a.svc.List()
 	if err != nil {
 		logger.Warningf("naive list: %v", err)
 		jsonMsg(c, "", err)
@@ -49,12 +55,11 @@ func (a *NaiveController) list(c *gin.Context) {
 }
 
 func (a *NaiveController) get(c *gin.Context) {
-	id, err := strconv.Atoi(c.Param("id"))
-	if err != nil {
-		c.JSON(http.StatusBadRequest, entity.Msg{Success: false, Msg: "bad id"})
+	id, ok := parseID(c)
+	if !ok {
 		return
 	}
-	row, err := a.naiveService.Get(id)
+	row, err := a.svc.Get(id)
 	if err != nil {
 		jsonMsg(c, "", err)
 		return
@@ -68,22 +73,21 @@ func (a *NaiveController) add(c *gin.Context) {
 		jsonMsg(c, "", err)
 		return
 	}
-	if err := a.naiveService.Add(srv); err != nil {
+	if err := a.svc.Add(srv); err != nil {
 		jsonMsg(c, "", err)
 		return
 	}
 	if srv.Enable {
-		if err := a.naiveService.Start(srv.Id); err != nil {
-			logger.Warningf("naive add: auto-start failed: %v", err)
+		if err := a.svc.Start(srv.Id); err != nil {
+			logger.Warningf("naive add: start failed: %v", err)
 		}
 	}
 	jsonObj(c, srv, nil)
 }
 
 func (a *NaiveController) update(c *gin.Context) {
-	id, err := strconv.Atoi(c.Param("id"))
-	if err != nil {
-		c.JSON(http.StatusBadRequest, entity.Msg{Success: false, Msg: "bad id"})
+	id, ok := parseID(c)
+	if !ok {
 		return
 	}
 	srv := &model.NaiveServer{}
@@ -92,13 +96,12 @@ func (a *NaiveController) update(c *gin.Context) {
 		return
 	}
 	srv.Id = id
-	if err := a.naiveService.Update(srv); err != nil {
+	if err := a.svc.Update(srv); err != nil {
 		jsonMsg(c, "", err)
 		return
 	}
-	// reload running process to pick up the new config
-	if st := a.naiveService.Status(id); st.Running {
-		if err := a.naiveService.Restart(id); err != nil {
+	if a.svc.Status(id).Running {
+		if err := a.svc.Restart(id); err != nil {
 			logger.Warningf("naive update: restart failed: %v", err)
 		}
 	}
@@ -106,12 +109,11 @@ func (a *NaiveController) update(c *gin.Context) {
 }
 
 func (a *NaiveController) delete(c *gin.Context) {
-	id, err := strconv.Atoi(c.Param("id"))
-	if err != nil {
-		c.JSON(http.StatusBadRequest, entity.Msg{Success: false, Msg: "bad id"})
+	id, ok := parseID(c)
+	if !ok {
 		return
 	}
-	if err := a.naiveService.Delete(id); err != nil {
+	if err := a.svc.Delete(id); err != nil {
 		jsonMsg(c, "", err)
 		return
 	}
@@ -119,21 +121,19 @@ func (a *NaiveController) delete(c *gin.Context) {
 }
 
 func (a *NaiveController) status(c *gin.Context) {
-	id, err := strconv.Atoi(c.Param("id"))
-	if err != nil {
-		c.JSON(http.StatusBadRequest, entity.Msg{Success: false, Msg: "bad id"})
+	id, ok := parseID(c)
+	if !ok {
 		return
 	}
-	jsonObj(c, a.naiveService.Status(id), nil)
+	jsonObj(c, a.svc.Status(id), nil)
 }
 
 func (a *NaiveController) start(c *gin.Context) {
-	id, err := strconv.Atoi(c.Param("id"))
-	if err != nil {
-		c.JSON(http.StatusBadRequest, entity.Msg{Success: false, Msg: "bad id"})
+	id, ok := parseID(c)
+	if !ok {
 		return
 	}
-	if err := a.naiveService.Start(id); err != nil {
+	if err := a.svc.Start(id); err != nil {
 		jsonMsg(c, "", err)
 		return
 	}
@@ -141,12 +141,11 @@ func (a *NaiveController) start(c *gin.Context) {
 }
 
 func (a *NaiveController) stop(c *gin.Context) {
-	id, err := strconv.Atoi(c.Param("id"))
-	if err != nil {
-		c.JSON(http.StatusBadRequest, entity.Msg{Success: false, Msg: "bad id"})
+	id, ok := parseID(c)
+	if !ok {
 		return
 	}
-	if err := a.naiveService.Stop(id); err != nil {
+	if err := a.svc.Stop(id); err != nil {
 		jsonMsg(c, "", err)
 		return
 	}
@@ -154,12 +153,11 @@ func (a *NaiveController) stop(c *gin.Context) {
 }
 
 func (a *NaiveController) restart(c *gin.Context) {
-	id, err := strconv.Atoi(c.Param("id"))
-	if err != nil {
-		c.JSON(http.StatusBadRequest, entity.Msg{Success: false, Msg: "bad id"})
+	id, ok := parseID(c)
+	if !ok {
 		return
 	}
-	if err := a.naiveService.Restart(id); err != nil {
+	if err := a.svc.Restart(id); err != nil {
 		jsonMsg(c, "", err)
 		return
 	}

@@ -1,8 +1,6 @@
 package model
 
-// NaiveServer represents a NaiveProxy server instance managed as an external process.
-// NaiveProxy is not an Xray protocol — the panel launches the `naive` binary
-// alongside Xray and writes a generated config to disk.
+// naive proxy server (runs as external process, not an xray protocol)
 type NaiveServer struct {
 	Id        int    `json:"id" form:"id" gorm:"primaryKey;autoIncrement"`
 	Remark    string `json:"remark" form:"remark"`
@@ -21,5 +19,4 @@ type NaiveServer struct {
 	UpdatedAt int64  `json:"updatedAt" gorm:"autoUpdateTime"`
 }
 
-// TableName overrides the default plural to keep migrations explicit.
 func (NaiveServer) TableName() string { return "naive_servers" }
