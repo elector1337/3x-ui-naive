@@ -26,6 +26,8 @@ const BASE_MIGRATED_ROUTES = {
   'panel/xray/': '/xray.html',
   'panel/nodes': '/nodes.html',
   'panel/nodes/': '/nodes.html',
+  'panel/naive': '/naive.html',
+  'panel/naive/': '/naive.html',
   'panel/api-docs': '/api-docs.html',
   'panel/api-docs/': '/api-docs.html',
 };
@@ -152,6 +154,7 @@ export default defineConfig({
         inbounds: path.resolve(__dirname, 'inbounds.html'),
         xray: path.resolve(__dirname, 'xray.html'),
         nodes: path.resolve(__dirname, 'nodes.html'),
+        naive: path.resolve(__dirname, 'naive.html'),
         apiDocs: path.resolve(__dirname, 'api-docs.html'),
         subpage: path.resolve(__dirname, 'subpage.html'),
       },

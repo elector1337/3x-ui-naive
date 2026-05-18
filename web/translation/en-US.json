@@ -95,6 +95,7 @@
     "dashboard": "Overview",
     "inbounds": "Inbounds",
     "nodes": "Nodes",
+    "naive": "Naive",
     "settings": "Panel Settings",
     "xray": "Xray Configs",
     "apiDocs": "API Docs",
@@ -396,6 +397,45 @@
       "days": "Day(s)",
       "renew": "Auto Renew",
       "renewDesc": "Auto-renewal after expiration. (0 = disable)(unit: day)"
+    },
+    "naive": {
+      "title": "Naive Servers",
+      "add": "Add",
+      "addTitle": "Add Naive Server",
+      "editTitle": "Edit Naive Server",
+      "enabled": "On",
+      "disabled": "Off",
+      "running": "Running",
+      "stopped": "Stopped",
+      "start": "Start",
+      "stop": "Stop",
+      "copyUrl": "Copy client URL",
+      "empty": "No naive servers yet",
+      "deleteConfirmTitle": "Delete \"{name}\"?",
+      "errDomain": "Domain is required",
+      "errPort": "Port must be between 1 and 65535",
+      "errAuth": "Auth user/pass is required",
+      "errCert": "Cert/key files are required",
+      "fields": {
+        "remark": "Remark",
+        "enable": "Auto-start on boot",
+        "domain": "Domain",
+        "port": "Port",
+        "listen": "Listen",
+        "authUser": "User",
+        "authPass": "Password",
+        "certFile": "Cert file path",
+        "keyFile": "Key file path",
+        "padding": "Padding",
+        "logLevel": "Log level",
+        "extraArgs": "Extra args"
+      },
+      "toasts": {
+        "deleted": "Deleted",
+        "started": "Started",
+        "stopped": "Stopped",
+        "restarted": "Restarted"
+      }
     },
     "nodes": {
       "title": "Nodes",

@@ -34,6 +34,7 @@ func (a *XUIController) initRouter(g *gin.RouterGroup) {
 	g.GET("/", a.index)
 	g.GET("/inbounds", a.inbounds)
 	g.GET("/nodes", a.nodes)
+	g.GET("/naive", a.naive)
 	g.GET("/settings", a.settings)
 	g.GET("/xray", a.xraySettings)
 	g.GET("/api-docs", a.apiDocs)
@@ -65,6 +66,11 @@ func (a *XUIController) inbounds(c *gin.Context) {
 // nodes renders the multi-panel nodes management page.
 func (a *XUIController) nodes(c *gin.Context) {
 	serveDistPage(c, "nodes.html")
+}
+
+// naive renders the NaiveProxy management page.
+func (a *XUIController) naive(c *gin.Context) {
+	serveDistPage(c, "naive.html")
 }
 
 // settings renders the settings management page.

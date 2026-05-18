@@ -95,6 +95,7 @@
     "dashboard": "Дашборд",
     "inbounds": "Подключения",
     "nodes": "Узлы",
+    "naive": "Naive",
     "settings": "Настройки",
     "xray": "Настройки Xray",
     "apiDocs": "Документация API",
@@ -396,6 +397,45 @@
       "days": "дней",
       "renew": "Автопродление",
       "renewDesc": "Автопродление после истечения срока действия. (0 = отключить)(единица: день)"
+    },
+    "naive": {
+      "title": "Серверы Naive",
+      "add": "Добавить",
+      "addTitle": "Добавить сервер Naive",
+      "editTitle": "Изменить сервер Naive",
+      "enabled": "Вкл",
+      "disabled": "Выкл",
+      "running": "Запущен",
+      "stopped": "Остановлен",
+      "start": "Запустить",
+      "stop": "Остановить",
+      "copyUrl": "Скопировать клиентский URL",
+      "empty": "Серверов пока нет",
+      "deleteConfirmTitle": "Удалить «{name}»?",
+      "errDomain": "Укажите домен",
+      "errPort": "Порт должен быть от 1 до 65535",
+      "errAuth": "Укажите пользователя и пароль",
+      "errCert": "Укажите пути к cert и key",
+      "fields": {
+        "remark": "Метка",
+        "enable": "Запускать при старте",
+        "domain": "Домен",
+        "port": "Порт",
+        "listen": "Listen",
+        "authUser": "Пользователь",
+        "authPass": "Пароль",
+        "certFile": "Путь к cert",
+        "keyFile": "Путь к key",
+        "padding": "Padding",
+        "logLevel": "Уровень логов",
+        "extraArgs": "Доп. аргументы"
+      },
+      "toasts": {
+        "deleted": "Удалено",
+        "started": "Запущено",
+        "stopped": "Остановлено",
+        "restarted": "Перезапущено"
+      }
     },
     "nodes": {
       "title": "Узлы",
