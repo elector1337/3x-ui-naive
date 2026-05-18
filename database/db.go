@@ -42,6 +42,7 @@ func initModels() error {
 		&model.CustomGeoResource{},
 		&model.Node{},
 		&model.ApiToken{},
+		&model.NaiveServer{},
 	}
 	for _, mdl := range models {
 		if err := db.AutoMigrate(mdl); err != nil {

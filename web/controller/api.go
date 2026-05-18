@@ -75,6 +75,9 @@ func (a *APIController) initRouter(g *gin.RouterGroup, customGeo *service.Custom
 
 	NewCustomGeoController(api.Group("/custom-geo"), customGeo)
 
+	// NaiveProxy management API
+	NewNaiveController(api.Group("/naive"))
+
 	// Extra routes
 	api.POST("/backuptotgbot", a.BackuptoTgbot)
 }

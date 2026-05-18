@@ -444,6 +444,9 @@ func (s *Server) start(restartXray bool, startTgBot bool) (err error) {
 
 	s.startTask(restartXray)
 
+	// bring up any naive servers marked Enable=true
+	go service.GetNaiveService().Restore()
+
 	if startTgBot {
 		isTgbotenabled, err := s.settingService.GetTgbotEnabled()
 		if (err == nil) && (isTgbotenabled) {
