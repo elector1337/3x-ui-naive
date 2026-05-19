@@ -2,6 +2,7 @@
 import { computed, ref, watch } from 'vue';
 import { useI18n } from 'vue-i18n';
 import { message } from 'ant-design-vue';
+import { HttpUtil } from '@/utils';
 
 const props = defineProps({
   open: { type: Boolean, default: false },
@@ -16,16 +17,20 @@ function blank() {
   return {
     remark: '',
     enable: false,
-    listen: '0.0.0.0',
+    listen: '',
     port: 443,
     domain: '',
+    useAcme: false,
+    acmeEmail: '',
     certFile: '',
     keyFile: '',
     authUser: '',
     authPass: '',
     padding: true,
-    logLevel: 'WARNING',
+    logLevel: 'WARN',
     extraArgs: '',
+    useRawConfig: false,
+    rawConfig: '',
   };
 }
 
@@ -49,11 +54,48 @@ function close() {
 
 function validate() {
   const f = form.value;
+  if (f.useRawConfig) {
+    if (!f.rawConfig.trim()) return t('pages.naive.errRawEmpty');
+    return null;
+  }
   if (!f.domain.trim()) return t('pages.naive.errDomain');
   if (!f.port || f.port < 1 || f.port > 65535) return t('pages.naive.errPort');
   if (!f.authUser.trim() || !f.authPass.trim()) return t('pages.naive.errAuth');
-  if (!f.certFile.trim() || !f.keyFile.trim()) return t('pages.naive.errCert');
+  if (f.useAcme) {
+    if (!f.acmeEmail.trim()) return t('pages.naive.errAcmeEmail');
+  } else if (!f.certFile.trim() || !f.keyFile.trim()) {
+    return t('pages.naive.errCert');
+  }
   return null;
+}
+
+// fill the raw editor with the Caddyfile we'd generate from the current form
+async function prefillRaw() {
+  const msg = await HttpUtil.post('/panel/api/naive/preview', { ...form.value, useRawConfig: false });
+  if (msg?.success && msg.obj) {
+    form.value.rawConfig = msg.obj;
+  }
+}
+
+const validating = ref(false);
+async function runValidate() {
+  if (!form.value.rawConfig.trim()) {
+    message.warning(t('pages.naive.errRawEmpty'));
+    return;
+  }
+  validating.value = true;
+  try {
+    const msg = await HttpUtil.post('/panel/api/naive/validate', { text: form.value.rawConfig });
+    if (msg?.success) message.success(t('pages.naive.rawValid'));
+    else message.error(msg?.msg || t('pages.naive.rawInvalid'));
+  } finally {
+    validating.value = false;
+  }
+}
+
+function onToggleRaw(v) {
+  form.value.useRawConfig = v;
+  if (v && !form.value.rawConfig.trim()) prefillRaw();
 }
 
 async function save() {
@@ -86,17 +128,50 @@ async function save() {
   >
     <a-form layout="vertical">
       <a-row :gutter="12">
-        <a-col :span="16">
+        <a-col :span="12">
           <a-form-item :label="t('pages.naive.fields.remark')">
             <a-input v-model:value="form.remark" />
           </a-form-item>
         </a-col>
-        <a-col :span="8">
+        <a-col :span="6">
           <a-form-item :label="t('pages.naive.fields.enable')">
             <a-switch v-model:checked="form.enable" />
           </a-form-item>
         </a-col>
+        <a-col :span="6">
+          <a-form-item :label="t('pages.naive.fields.advanced')">
+            <a-switch
+              :checked="form.useRawConfig"
+              @change="onToggleRaw"
+            />
+          </a-form-item>
+        </a-col>
       </a-row>
+
+      <!-- Advanced (raw Caddyfile) mode -->
+      <template v-if="form.useRawConfig">
+        <a-alert
+          type="info"
+          show-icon
+          :message="t('pages.naive.rawHint')"
+          style="margin-bottom: 12px;"
+        />
+        <a-form-item :label="t('pages.naive.fields.rawConfig')" required>
+          <a-textarea
+            v-model:value="form.rawConfig"
+            :auto-size="{ minRows: 12, maxRows: 24 }"
+            class="raw-editor"
+            spellcheck="false"
+          />
+        </a-form-item>
+        <a-space style="margin-bottom: 12px;">
+          <a-button :loading="validating" @click="runValidate">{{ t('pages.naive.validate') }}</a-button>
+          <a-button @click="prefillRaw">{{ t('pages.naive.regenerate') }}</a-button>
+        </a-space>
+      </template>
+
+      <!-- Simple form mode -->
+      <template v-else>
 
       <a-row :gutter="12">
         <a-col :span="14">
@@ -111,7 +186,7 @@ async function save() {
         </a-col>
         <a-col :span="4">
           <a-form-item :label="t('pages.naive.fields.listen')">
-            <a-input v-model:value="form.listen" />
+            <a-input v-model:value="form.listen" placeholder="all" />
           </a-form-item>
         </a-col>
       </a-row>
@@ -129,12 +204,27 @@ async function save() {
         </a-col>
       </a-row>
 
-      <a-form-item :label="t('pages.naive.fields.certFile')" required>
-        <a-input v-model:value="form.certFile" placeholder="/etc/letsencrypt/live/example.com/fullchain.pem" />
-      </a-form-item>
-      <a-form-item :label="t('pages.naive.fields.keyFile')" required>
-        <a-input v-model:value="form.keyFile" placeholder="/etc/letsencrypt/live/example.com/privkey.pem" />
-      </a-form-item>
+      <a-row :gutter="12">
+        <a-col :span="10">
+          <a-form-item :label="t('pages.naive.fields.useAcme')">
+            <a-switch v-model:checked="form.useAcme" />
+          </a-form-item>
+        </a-col>
+        <a-col :span="14">
+          <a-form-item v-if="form.useAcme" :label="t('pages.naive.fields.acmeEmail')" required>
+            <a-input v-model:value="form.acmeEmail" placeholder="me@example.com" />
+          </a-form-item>
+        </a-col>
+      </a-row>
+
+      <template v-if="!form.useAcme">
+        <a-form-item :label="t('pages.naive.fields.certFile')" required>
+          <a-input v-model:value="form.certFile" placeholder="/etc/letsencrypt/live/example.com/fullchain.pem" />
+        </a-form-item>
+        <a-form-item :label="t('pages.naive.fields.keyFile')" required>
+          <a-input v-model:value="form.keyFile" placeholder="/etc/letsencrypt/live/example.com/privkey.pem" />
+        </a-form-item>
+      </template>
 
       <a-row :gutter="12">
         <a-col :span="8">
@@ -147,7 +237,7 @@ async function save() {
             <a-select v-model:value="form.logLevel">
               <a-select-option value="DEBUG">DEBUG</a-select-option>
               <a-select-option value="INFO">INFO</a-select-option>
-              <a-select-option value="WARNING">WARNING</a-select-option>
+              <a-select-option value="WARN">WARN</a-select-option>
               <a-select-option value="ERROR">ERROR</a-select-option>
             </a-select>
           </a-form-item>
@@ -158,6 +248,15 @@ async function save() {
           </a-form-item>
         </a-col>
       </a-row>
+      </template>
     </a-form>
   </a-modal>
 </template>
+
+<style scoped>
+.raw-editor :deep(textarea) {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 12px;
+  tab-size: 4;
+}
+</style>

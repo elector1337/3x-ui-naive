@@ -1,12 +1,14 @@
 package service
 
 import (
-	"encoding/json"
+	"context"
 	"errors"
 	"fmt"
+	"net"
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"sync"
 	"syscall"
@@ -22,23 +24,25 @@ import (
 
 var (
 	ErrNaiveNotFound       = errors.New("naive server not found")
-	ErrNaiveBinaryMissing  = errors.New("naive binary not found")
+	ErrNaiveBinaryMissing  = errors.New("caddy binary with forward_proxy plugin not found (set CADDY_BIN or place 'caddy' in PATH)")
 	ErrNaiveAlreadyRunning = errors.New("naive server already running")
 	ErrNaiveInvalidConfig  = errors.New("invalid naive server config")
 )
 
 type NaiveStatus struct {
-	Id      int    `json:"id"`
-	Running bool   `json:"running"`
-	Pid     int    `json:"pid,omitempty"`
-	Since   int64  `json:"since,omitempty"`
-	LogPath string `json:"logPath,omitempty"`
+	Id        int    `json:"id"`
+	Running   bool   `json:"running"`
+	Pid       int    `json:"pid,omitempty"`
+	Since     int64  `json:"since,omitempty"`
+	LogPath   string `json:"logPath,omitempty"`
+	Listening bool   `json:"listening"`
 }
 
 type naiveProc struct {
 	cmd     *exec.Cmd
 	started time.Time
 	logPath string
+	port    int
 }
 
 type NaiveService struct {
@@ -71,12 +75,22 @@ func (s *NaiveService) Add(srv *model.NaiveServer) error {
 	if err := validateNaive(srv); err != nil {
 		return err
 	}
+	if !srv.UseRawConfig {
+		if err := crossCheckNaivePort(srv, 0); err != nil {
+			return err
+		}
+	}
 	return database.GetDB().Create(srv).Error
 }
 
 func (s *NaiveService) Update(srv *model.NaiveServer) error {
 	if err := validateNaive(srv); err != nil {
 		return err
+	}
+	if !srv.UseRawConfig {
+		if err := crossCheckNaivePort(srv, srv.Id); err != nil {
+			return err
+		}
 	}
 	return database.GetDB().Save(srv).Error
 }
@@ -88,21 +102,33 @@ func (s *NaiveService) Delete(id int) error {
 
 func (s *NaiveService) Status(id int) NaiveStatus {
 	s.mu.Lock()
-	defer s.mu.Unlock()
 	st := NaiveStatus{Id: id}
 	p, ok := s.procs[id]
 	if !ok || p.cmd == nil || p.cmd.Process == nil {
+		s.mu.Unlock()
 		return st
 	}
-	// signal 0 probes if the pid is still alive
 	if err := p.cmd.Process.Signal(syscall.Signal(0)); err != nil {
 		delete(s.procs, id)
+		s.mu.Unlock()
 		return st
 	}
 	st.Running = true
 	st.Pid = p.cmd.Process.Pid
 	st.Since = p.started.Unix()
 	st.LogPath = p.logPath
+	port := p.port
+	s.mu.Unlock()
+
+	// TCP probe — verify the port is actually accepting connections
+	if port > 0 {
+		host := "127.0.0.1"
+		conn, err := net.DialTimeout("tcp", net.JoinHostPort(host, strconv.Itoa(port)), 300*time.Millisecond)
+		if err == nil {
+			_ = conn.Close()
+			st.Listening = true
+		}
+	}
 	return st
 }
 
@@ -129,7 +155,7 @@ func (s *NaiveService) Start(id int) error {
 	if err != nil {
 		return err
 	}
-	cfgPath := filepath.Join(dir, fmt.Sprintf("naive-%d.json", id))
+	cfgPath := filepath.Join(dir, fmt.Sprintf("naive-%d.caddyfile", id))
 	if err := writeNaiveConfig(cfgPath, srv); err != nil {
 		return err
 	}
@@ -139,19 +165,30 @@ func (s *NaiveService) Start(id int) error {
 		return fmt.Errorf("open log: %w", err)
 	}
 
-	args := []string{"--config=" + cfgPath}
+	args := []string{"run", "--config", cfgPath, "--adapter", "caddyfile"}
 	if extra := strings.TrimSpace(srv.ExtraArgs); extra != "" {
 		args = append(args, strings.Fields(extra)...)
 	}
 	cmd := exec.Command(bin, args...)
 	cmd.Stdout = logFile
 	cmd.Stderr = logFile
+	// isolate caddy state per server so instances don't clobber each other's
+	// ACME storage, locks, etc.
+	dataDir := filepath.Join(dir, fmt.Sprintf("data-%d", id))
+	if err := os.MkdirAll(dataDir, 0o700); err != nil {
+		_ = logFile.Close()
+		return fmt.Errorf("mkdir data dir: %w", err)
+	}
+	cmd.Env = append(os.Environ(),
+		"XDG_DATA_HOME="+dataDir,
+		"XDG_CONFIG_HOME="+dataDir,
+	)
 
 	if err := cmd.Start(); err != nil {
 		_ = logFile.Close()
 		return fmt.Errorf("start naive: %w", err)
 	}
-	s.procs[id] = &naiveProc{cmd: cmd, started: time.Now(), logPath: logPath}
+	s.procs[id] = &naiveProc{cmd: cmd, started: time.Now(), logPath: logPath, port: srv.Port}
 	logger.Infof("naive: server %d started, pid=%d", id, cmd.Process.Pid)
 
 	// reap so dead procs disappear from status
@@ -208,6 +245,13 @@ func validateNaive(srv *model.NaiveServer) error {
 	if srv == nil {
 		return ErrNaiveInvalidConfig
 	}
+	// raw mode: panel doesn't generate, user provides the whole Caddyfile
+	if srv.UseRawConfig {
+		if strings.TrimSpace(srv.RawConfig) == "" {
+			return fmt.Errorf("%w: raw config is empty", ErrNaiveInvalidConfig)
+		}
+		return nil
+	}
 	if srv.Port <= 0 || srv.Port > 65535 {
 		return fmt.Errorf("%w: bad port", ErrNaiveInvalidConfig)
 	}
@@ -217,35 +261,108 @@ func validateNaive(srv *model.NaiveServer) error {
 	if strings.TrimSpace(srv.AuthUser) == "" || strings.TrimSpace(srv.AuthPass) == "" {
 		return fmt.Errorf("%w: auth required", ErrNaiveInvalidConfig)
 	}
-	if strings.TrimSpace(srv.CertFile) == "" || strings.TrimSpace(srv.KeyFile) == "" {
-		return fmt.Errorf("%w: cert/key required", ErrNaiveInvalidConfig)
+	if srv.UseACME {
+		if strings.TrimSpace(srv.AcmeEmail) == "" {
+			return fmt.Errorf("%w: acme email required", ErrNaiveInvalidConfig)
+		}
+	} else if strings.TrimSpace(srv.CertFile) == "" || strings.TrimSpace(srv.KeyFile) == "" {
+		return fmt.Errorf("%w: cert/key required (or enable ACME)", ErrNaiveInvalidConfig)
 	}
 	return nil
 }
 
-func writeNaiveConfig(path string, srv *model.NaiveServer) error {
-	listen := srv.Listen
-	if listen == "" {
-		listen = "0.0.0.0"
+// RenderCaddyfile returns the Caddyfile text the panel would produce for srv.
+// Used by the UI to preview the generated config or to seed the raw-mode editor.
+func RenderCaddyfile(srv *model.NaiveServer) string {
+	if srv == nil {
+		return ""
 	}
-	cfg := map[string]any{
-		"listen":    fmt.Sprintf("https://%s:%s@%s:%d", srv.AuthUser, srv.AuthPass, listen, srv.Port),
-		"cert":      srv.CertFile,
-		"key":       srv.KeyFile,
-		"log":       "",
-		"log_level": strings.ToUpper(strings.TrimSpace(firstNonEmpty(srv.LogLevel, "WARNING"))),
+	if srv.UseRawConfig {
+		return srv.RawConfig
 	}
-	if srv.Padding {
-		cfg["padding"] = true
+	return renderNaiveCaddyfile(srv)
+}
+
+// ValidateCaddyfile runs `caddy adapt` against the given text to verify syntax.
+// Requires a working caddy binary; if none is installed, returns a clear error.
+func ValidateCaddyfile(ctx context.Context, text string) error {
+	bin, _ := findCaddy()
+	if bin == "" {
+		return ErrNaiveBinaryMissing
 	}
-	if srv.Domain != "" {
-		cfg["host"] = srv.Domain
-	}
-	data, err := json.MarshalIndent(cfg, "", "  ")
+	tmp, err := os.CreateTemp("", "naive-validate-*.caddyfile")
 	if err != nil {
 		return err
 	}
-	return os.WriteFile(path, data, 0o600)
+	defer os.Remove(tmp.Name())
+	if _, err := tmp.WriteString(text); err != nil {
+		_ = tmp.Close()
+		return err
+	}
+	_ = tmp.Close()
+
+	cmd := exec.CommandContext(ctx, bin, "adapt", "--config", tmp.Name(), "--adapter", "caddyfile")
+	out, err := cmd.CombinedOutput()
+	if err != nil {
+		msg := strings.TrimSpace(string(out))
+		if msg == "" {
+			msg = err.Error()
+		}
+		return errors.New(msg)
+	}
+	return nil
+}
+
+// writeNaiveConfig emits a Caddyfile for the klzgrad/forwardproxy fork of Caddy
+// see https://github.com/klzgrad/naiveproxy server setup
+func writeNaiveConfig(path string, srv *model.NaiveServer) error {
+	if srv.UseRawConfig {
+		return os.WriteFile(path, []byte(srv.RawConfig), 0o600)
+	}
+	return os.WriteFile(path, []byte(renderNaiveCaddyfile(srv)), 0o600)
+}
+
+func renderNaiveCaddyfile(srv *model.NaiveServer) string {
+	listen := strings.TrimSpace(srv.Listen)
+	// 0.0.0.0 / :: / empty all mean "bind everywhere" — Caddy uses bare :port for that.
+	bindAll := listen == "" || listen == "0.0.0.0" || listen == "::"
+
+	level := strings.ToUpper(strings.TrimSpace(firstNonEmpty(srv.LogLevel, "WARN")))
+	if level == "WARNING" {
+		level = "WARN" // back-compat for old rows
+	}
+
+	var b strings.Builder
+	// admin off so multiple naive instances don't fight over :2019
+	b.WriteString("{\n")
+	b.WriteString("\tadmin off\n")
+	fmt.Fprintf(&b, "\tlog {\n\t\tlevel %s\n\t}\n", level)
+	b.WriteString("}\n\n")
+
+	fmt.Fprintf(&b, ":%d, %s {\n", srv.Port, srv.Domain)
+	if !bindAll {
+		fmt.Fprintf(&b, "\tbind %s\n", listen)
+	}
+	if srv.UseACME {
+		// ACME: Caddy will obtain certs via Let's Encrypt
+		fmt.Fprintf(&b, "\ttls %s\n", srv.AcmeEmail)
+	} else {
+		fmt.Fprintf(&b, "\ttls %s %s\n", srv.CertFile, srv.KeyFile)
+	}
+	b.WriteString("\troute {\n")
+	b.WriteString("\t\tforward_proxy {\n")
+	fmt.Fprintf(&b, "\t\t\tbasic_auth %s %s\n", srv.AuthUser, srv.AuthPass)
+	b.WriteString("\t\t\thide_ip\n")
+	b.WriteString("\t\t\thide_via\n")
+	b.WriteString("\t\t\tprobe_resistance\n")
+	if srv.Padding {
+		b.WriteString("\t\t\tpadding\n")
+	}
+	b.WriteString("\t\t}\n")
+	b.WriteString("\t}\n")
+	b.WriteString("}\n")
+
+	return b.String()
 }
 
 func firstNonEmpty(vals ...string) string {
@@ -258,16 +375,11 @@ func firstNonEmpty(vals ...string) string {
 }
 
 func resolveNaiveBinary() (string, error) {
-	if env := strings.TrimSpace(os.Getenv("NAIVE_BIN")); env != "" {
-		if _, err := os.Stat(env); err == nil {
-			return env, nil
-		}
-		return "", fmt.Errorf("%w: NAIVE_BIN=%q", ErrNaiveBinaryMissing, env)
+	p, _ := findCaddy()
+	if p == "" {
+		return "", ErrNaiveBinaryMissing
 	}
-	if p, err := exec.LookPath("naive"); err == nil {
-		return p, nil
-	}
-	return "", ErrNaiveBinaryMissing
+	return p, nil
 }
 
 func ensureNaiveDir() (string, error) {

@@ -406,6 +406,7 @@
       "enabled": "Вкл",
       "disabled": "Выкл",
       "running": "Запущен",
+      "starting": "Запускается…",
       "stopped": "Остановлен",
       "start": "Запустить",
       "stop": "Остановить",
@@ -418,7 +419,14 @@
       "errDomain": "Укажите домен",
       "errPort": "Порт должен быть от 1 до 65535",
       "errAuth": "Укажите пользователя и пароль",
-      "errCert": "Укажите пути к cert и key",
+      "errCert": "Укажите cert и key (или включите ACME)",
+      "errAcmeEmail": "Укажите email для ACME",
+      "errRawEmpty": "Caddyfile пустой",
+      "rawHint": "Продвинутый режим: простые поля игнорируются. Полный контроль над Caddyfile.",
+      "rawValid": "Caddyfile валиден",
+      "rawInvalid": "Caddyfile невалиден",
+      "validate": "Проверить",
+      "regenerate": "Сгенерировать из формы",
       "fields": {
         "remark": "Метка",
         "enable": "Запускать при старте",
@@ -427,17 +435,31 @@
         "listen": "Listen",
         "authUser": "Пользователь",
         "authPass": "Пароль",
+        "useAcme": "Авто-TLS (Let's Encrypt)",
+        "acmeEmail": "Email для ACME",
         "certFile": "Путь к cert",
         "keyFile": "Путь к key",
         "padding": "Padding",
         "logLevel": "Уровень логов",
-        "extraArgs": "Доп. аргументы"
+        "extraArgs": "Доп. аргументы",
+        "advanced": "Продвинутый",
+        "rawConfig": "Caddyfile"
       },
       "toasts": {
         "deleted": "Удалено",
         "started": "Запущено",
         "stopped": "Остановлено",
-        "restarted": "Перезапущено"
+        "restarted": "Перезапущено",
+        "caddyInstalled": "Caddy установлен",
+        "caddyInstallFailed": "Не удалось установить Caddy"
+      },
+      "caddy": {
+        "missingTitle": "Caddy с плагином forward_proxy не установлен",
+        "canInstall": "Нажми «Установить» — соберём через xcaddy. Нужен Go на хосте. Займёт пару минут.",
+        "noGo": "Сначала установи Go 1.22+ (https://go.dev/dl/), затем нажми «Установить».",
+        "install": "Установить",
+        "installing": "Устанавливаю…",
+        "installedTitle": "Caddy готов ({v})"
       }
     },
     "nodes": {

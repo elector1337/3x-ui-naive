@@ -14,11 +14,15 @@ import (
 
 type NaiveController struct {
 	BaseController
-	svc *service.NaiveService
+	svc       *service.NaiveService
+	installer *service.CaddyInstaller
 }
 
 func NewNaiveController(g *gin.RouterGroup) *NaiveController {
-	a := &NaiveController{svc: service.GetNaiveService()}
+	a := &NaiveController{
+		svc:       service.GetNaiveService(),
+		installer: service.NewCaddyInstaller(),
+	}
 	a.initRouter(g)
 	return a
 }
@@ -33,6 +37,10 @@ func (a *NaiveController) initRouter(g *gin.RouterGroup) {
 	g.POST("/start/:id", a.start)
 	g.POST("/stop/:id", a.stop)
 	g.POST("/restart/:id", a.restart)
+	g.GET("/caddy-status", a.caddyStatus)
+	g.POST("/install-caddy", a.installCaddy)
+	g.POST("/preview", a.preview)
+	g.POST("/validate", a.validate)
 }
 
 func parseID(c *gin.Context) (int, bool) {
@@ -150,6 +158,64 @@ func (a *NaiveController) stop(c *gin.Context) {
 		return
 	}
 	jsonMsg(c, "stopped", nil)
+}
+
+// preview renders the Caddyfile the panel would write for the given form values.
+// The UI shows it next to the form so users can see exactly what runs.
+func (a *NaiveController) preview(c *gin.Context) {
+	srv := &model.NaiveServer{}
+	if err := c.ShouldBind(srv); err != nil {
+		jsonMsg(c, "", err)
+		return
+	}
+	jsonObj(c, service.RenderCaddyfile(srv), nil)
+}
+
+// validate runs `caddy adapt` on the given Caddyfile text to surface syntax errors.
+func (a *NaiveController) validate(c *gin.Context) {
+	var body struct {
+		Text string `json:"text" form:"text"`
+	}
+	if err := c.ShouldBind(&body); err != nil {
+		jsonMsg(c, "", err)
+		return
+	}
+	if err := service.ValidateCaddyfile(c.Request.Context(), body.Text); err != nil {
+		jsonMsg(c, "", err)
+		return
+	}
+	jsonMsg(c, "ok", nil)
+}
+
+func (a *NaiveController) caddyStatus(c *gin.Context) {
+	jsonObj(c, a.installer.Status(), nil)
+}
+
+// installCaddy runs xcaddy to build caddy with the forward_proxy plugin.
+// The build can take a couple of minutes; we stream progress as server-sent
+// events so the UI can show a live log.
+func (a *NaiveController) installCaddy(c *gin.Context) {
+	c.Writer.Header().Set("Content-Type", "text/event-stream")
+	c.Writer.Header().Set("Cache-Control", "no-cache")
+	c.Writer.Header().Set("X-Accel-Buffering", "no")
+	c.Writer.Flush()
+
+	lines := make(chan string, 64)
+	errCh := make(chan error, 1)
+	go func() {
+		errCh <- a.installer.Install(c.Request.Context(), lines)
+	}()
+
+	for line := range lines {
+		_, _ = c.Writer.Write([]byte("data: " + line + "\n\n"))
+		c.Writer.Flush()
+	}
+	if err := <-errCh; err != nil {
+		_, _ = c.Writer.Write([]byte("event: error\ndata: " + err.Error() + "\n\n"))
+	} else {
+		_, _ = c.Writer.Write([]byte("event: done\ndata: ok\n\n"))
+	}
+	c.Writer.Flush()
 }
 
 func (a *NaiveController) restart(c *gin.Context) {

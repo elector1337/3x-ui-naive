@@ -1,6 +1,8 @@
 import { onMounted, ref, shallowRef } from 'vue';
 import { HttpUtil } from '@/utils';
 
+const BASE_PATH = window.X_UI_BASE_PATH || '';
+
 // /panel/api/naive — CRUD + lifecycle
 export function useNaive() {
   const servers = shallowRef([]);
@@ -16,10 +18,19 @@ export function useNaive() {
         servers.value = Array.isArray(msg.obj) ? msg.obj : [];
       }
       fetched.value = true;
+      await refreshCaddyStatus();
       await refreshStatuses();
     } finally {
       loading.value = false;
     }
+  }
+
+  const caddy = ref({ installed: false, path: '', source: '', version: '', goPresent: false });
+  async function refreshCaddyStatus() {
+    try {
+      const msg = await HttpUtil.get('/panel/api/naive/caddy-status');
+      if (msg?.success && msg.obj) caddy.value = msg.obj;
+    } catch (_e) { /* keep stale */ }
   }
 
   async function refreshStatuses() {
@@ -71,6 +82,43 @@ export function useNaive() {
     return msg;
   }
 
+  // installCaddy posts to the SSE endpoint and resolves after the build finishes.
+  // Returns { ok, log } — the full xcaddy output for display.
+  async function previewCaddyfile(payload) {
+    return HttpUtil.post('/panel/api/naive/preview', payload);
+  }
+
+  async function validateCaddyfile(text) {
+    return HttpUtil.post('/panel/api/naive/validate', { text });
+  }
+
+  async function installCaddy(onChunk) {
+    const res = await fetch(BASE_PATH + 'panel/api/naive/install-caddy', { method: 'POST' });
+    if (!res.body) throw new Error('streaming not supported');
+    const reader = res.body.getReader();
+    const decoder = new TextDecoder();
+    let buf = '';
+    let log = '';
+    let ok = true;
+    let err = '';
+    while (true) {
+      const { value, done } = await reader.read();
+      if (done) break;
+      buf += decoder.decode(value, { stream: true });
+      let idx;
+      while ((idx = buf.indexOf('\n\n')) !== -1) {
+        const frame = buf.slice(0, idx); buf = buf.slice(idx + 2);
+        const event = /^event:\s*(\S+)/m.exec(frame)?.[1] || 'message';
+        const data = (/^data:\s?(.*)$/m.exec(frame)?.[1]) ?? '';
+        if (event === 'error') { ok = false; err = data; }
+        else if (event === 'done') { ok = true; }
+        else { log += data + '\n'; if (onChunk) onChunk(data); }
+      }
+    }
+    await refreshCaddyStatus();
+    return { ok, log, err };
+  }
+
   onMounted(refresh);
 
   return {
@@ -78,8 +126,13 @@ export function useNaive() {
     statuses,
     loading,
     fetched,
+    caddy,
     refresh,
     refreshStatuses,
+    refreshCaddyStatus,
+    installCaddy,
+    previewCaddyfile,
+    validateCaddyfile,
     create,
     update,
     remove,

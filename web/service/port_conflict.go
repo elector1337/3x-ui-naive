@@ -149,6 +149,12 @@ func (s *InboundService) checkPortConflict(inbound *model.Inbound, ignoreId int)
 			return true, nil
 		}
 	}
+	// also check naive servers (managed by the panel, run locally as caddy procs)
+	if naiveOther, err := naivePortConflictsInbound(inbound); err != nil {
+		return false, err
+	} else if naiveOther != nil {
+		return true, nil
+	}
 	return false, nil
 }
 

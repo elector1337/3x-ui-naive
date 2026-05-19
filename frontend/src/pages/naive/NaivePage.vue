@@ -30,7 +30,9 @@ const {
   statuses,
   loading,
   fetched,
+  caddy,
   refresh,
+  installCaddy,
   create,
   update,
   remove,
@@ -38,6 +40,22 @@ const {
   stop,
   restart,
 } = useNaive();
+
+const installing = ref(false);
+const installLog = ref('');
+async function onInstallCaddy() {
+  installing.value = true;
+  installLog.value = '';
+  try {
+    const res = await installCaddy((chunk) => { installLog.value += chunk + '\n'; });
+    if (res.ok) message.success(t('pages.naive.toasts.caddyInstalled'));
+    else message.error(res.err || t('pages.naive.toasts.caddyInstallFailed'));
+  } catch (e) {
+    message.error(String(e?.message || e));
+  } finally {
+    installing.value = false;
+  }
+}
 
 const { isMobile } = useMediaQuery();
 
@@ -139,6 +157,43 @@ const columns = computed(() => [
             <div v-if="!fetched" class="loading-spacer" />
 
             <a-row v-else :gutter="[isMobile ? 8 : 16, isMobile ? 8 : 12]">
+              <!-- caddy install banner -->
+              <a-col v-if="!caddy.installed" :span="24">
+                <a-alert
+                  type="warning"
+                  show-icon
+                  :message="t('pages.naive.caddy.missingTitle')"
+                  :description="caddy.goPresent ? t('pages.naive.caddy.canInstall') : t('pages.naive.caddy.noGo')"
+                >
+                  <template #action>
+                    <a-button
+                      v-if="caddy.goPresent"
+                      size="small"
+                      type="primary"
+                      :loading="installing"
+                      @click="onInstallCaddy"
+                    >
+                      {{ installing ? t('pages.naive.caddy.installing') : t('pages.naive.caddy.install') }}
+                    </a-button>
+                  </template>
+                </a-alert>
+              </a-col>
+              <a-col v-if="installing || installLog" :span="24">
+                <a-card size="small">
+                  <pre class="install-log">{{ installLog || '...' }}</pre>
+                </a-card>
+              </a-col>
+
+              <a-col v-if="caddy.installed" :span="24">
+                <a-alert
+                  type="success"
+                  show-icon
+                  :message="t('pages.naive.caddy.installedTitle', { v: caddy.version || '?' })"
+                  :description="`${caddy.source}: ${caddy.path}`"
+                  closable
+                />
+              </a-col>
+
               <!-- summary -->
               <a-col :span="24">
                 <a-card size="small" hoverable class="summary-card">
@@ -187,7 +242,64 @@ const columns = computed(() => [
                     </a-space>
                   </template>
 
+                  <!-- mobile card stack -->
+                  <div v-if="isMobile" class="mobile-cards">
+                    <div v-if="servers.length === 0" class="card-empty">
+                      <a-empty :description="t('pages.naive.empty')" />
+                    </div>
+                    <div v-for="srv in servers" :key="srv.id" class="srv-card">
+                      <div class="srv-head">
+                        <div class="srv-title">{{ srv.remark || `naive-${srv.id}` }}</div>
+                        <a-tag
+                          v-if="isRunning(srv.id) && statuses[srv.id]?.listening"
+                          color="success"
+                        >{{ t('pages.naive.running') }}</a-tag>
+                        <a-tag v-else-if="isRunning(srv.id)" color="processing">{{ t('pages.naive.starting') }}</a-tag>
+                        <a-tag v-else color="default">{{ t('pages.naive.stopped') }}</a-tag>
+                      </div>
+                      <div class="srv-row">
+                        <span class="srv-label">Endpoint</span>
+                        <code>{{ srv.domain }}:{{ srv.port }}</code>
+                      </div>
+                      <div class="srv-row">
+                        <span class="srv-label">{{ t('pages.naive.fields.enable') }}</span>
+                        <a-tag :color="srv.enable ? 'green' : 'default'" :bordered="false">
+                          {{ srv.enable ? t('pages.naive.enabled') : t('pages.naive.disabled') }}
+                        </a-tag>
+                      </div>
+                      <a-space :size="6" wrap class="srv-actions">
+                        <a-button size="small" @click="onCopy(srv)">
+                          <template #icon><CopyOutlined /></template>
+                        </a-button>
+                        <a-button
+                          v-if="!isRunning(srv.id)"
+                          size="small"
+                          type="primary"
+                          @click="onStart(srv)"
+                        >
+                          <template #icon><PlayCircleOutlined /></template>
+                          {{ t('pages.naive.start') }}
+                        </a-button>
+                        <a-button v-else size="small" danger @click="onStop(srv)">
+                          <template #icon><PauseCircleOutlined /></template>
+                          {{ t('pages.naive.stop') }}
+                        </a-button>
+                        <a-button size="small" :disabled="!isRunning(srv.id)" @click="onRestart(srv)">
+                          <template #icon><ReloadOutlined /></template>
+                        </a-button>
+                        <a-button size="small" @click="onEdit(srv)">
+                          <template #icon><EditOutlined /></template>
+                        </a-button>
+                        <a-button size="small" danger @click="onDelete(srv)">
+                          <template #icon><DeleteOutlined /></template>
+                        </a-button>
+                      </a-space>
+                    </div>
+                  </div>
+
+                  <!-- desktop table -->
                   <a-table
+                    v-else
                     :columns="columns"
                     :data-source="servers"
                     :pagination="false"
@@ -211,8 +323,14 @@ const columns = computed(() => [
                       </template>
 
                       <template v-else-if="column.key === 'status'">
-                        <a-tag v-if="isRunning(record.id)" color="processing">
+                        <a-tag
+                          v-if="isRunning(record.id) && statuses[record.id]?.listening"
+                          color="success"
+                        >
                           {{ t('pages.naive.running') }}
+                        </a-tag>
+                        <a-tag v-else-if="isRunning(record.id)" color="processing">
+                          {{ t('pages.naive.starting') }}
                         </a-tag>
                         <a-tag v-else color="default">{{ t('pages.naive.stopped') }}</a-tag>
                       </template>
@@ -327,5 +445,73 @@ const columns = computed(() => [
 
 .list-card code {
   font-size: 12px;
+}
+
+.install-log {
+  max-height: 240px;
+  overflow: auto;
+  font-size: 11px;
+  white-space: pre-wrap;
+  margin: 0;
+}
+
+/* mobile card stack — mirrors the nodes/inbounds responsive pattern */
+.mobile-cards {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.card-empty {
+  padding: 16px 0;
+}
+
+.srv-card {
+  border: 1px solid rgba(0, 0, 0, 0.06);
+  border-radius: 6px;
+  padding: 10px 12px;
+  background: var(--bg-card);
+}
+
+.naive-page.is-dark .srv-card {
+  border-color: rgba(255, 255, 255, 0.08);
+}
+
+.srv-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 6px;
+}
+
+.srv-title {
+  font-weight: 600;
+  font-size: 14px;
+  margin-right: 8px;
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.srv-row {
+  display: flex;
+  justify-content: space-between;
+  font-size: 12px;
+  padding: 2px 0;
+  gap: 12px;
+}
+
+.srv-row code {
+  font-size: 12px;
+  color: inherit;
+}
+
+.srv-label {
+  opacity: 0.65;
+}
+
+.srv-actions {
+  margin-top: 8px;
 }
 </style>

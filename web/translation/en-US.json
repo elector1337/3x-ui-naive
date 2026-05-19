@@ -406,6 +406,7 @@
       "enabled": "On",
       "disabled": "Off",
       "running": "Running",
+      "starting": "Starting…",
       "stopped": "Stopped",
       "start": "Start",
       "stop": "Stop",
@@ -418,7 +419,14 @@
       "errDomain": "Domain is required",
       "errPort": "Port must be between 1 and 65535",
       "errAuth": "Auth user/pass is required",
-      "errCert": "Cert/key files are required",
+      "errCert": "Cert/key files are required (or enable ACME)",
+      "errAcmeEmail": "ACME email is required",
+      "errRawEmpty": "Caddyfile is empty",
+      "rawHint": "Advanced mode: simple fields are ignored. You have full control over the Caddyfile.",
+      "rawValid": "Caddyfile is valid",
+      "rawInvalid": "Caddyfile is invalid",
+      "validate": "Validate",
+      "regenerate": "Regenerate from form",
       "fields": {
         "remark": "Remark",
         "enable": "Auto-start on boot",
@@ -427,17 +435,31 @@
         "listen": "Listen",
         "authUser": "User",
         "authPass": "Password",
+        "useAcme": "Auto TLS (Let's Encrypt)",
+        "acmeEmail": "ACME email",
         "certFile": "Cert file path",
         "keyFile": "Key file path",
         "padding": "Padding",
         "logLevel": "Log level",
-        "extraArgs": "Extra args"
+        "extraArgs": "Extra args",
+        "advanced": "Advanced",
+        "rawConfig": "Caddyfile"
       },
       "toasts": {
         "deleted": "Deleted",
         "started": "Started",
         "stopped": "Stopped",
-        "restarted": "Restarted"
+        "restarted": "Restarted",
+        "caddyInstalled": "Caddy installed",
+        "caddyInstallFailed": "Caddy install failed"
+      },
+      "caddy": {
+        "missingTitle": "Caddy with forward_proxy plugin is not installed",
+        "canInstall": "Click Install to build it via xcaddy. Requires Go on the host. Takes a couple of minutes.",
+        "noGo": "Install Go 1.22+ first (https://go.dev/dl/), then click Install.",
+        "install": "Install",
+        "installing": "Installing…",
+        "installedTitle": "Caddy ready ({v})"
       }
     },
     "nodes": {

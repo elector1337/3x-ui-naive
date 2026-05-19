@@ -8,13 +8,17 @@ type NaiveServer struct {
 	Listen    string `json:"listen" form:"listen"`
 	Port      int    `json:"port" form:"port"`
 	Domain    string `json:"domain" form:"domain"`
+	UseACME   bool   `json:"useAcme" form:"useAcme" gorm:"default:false"`
+	AcmeEmail string `json:"acmeEmail" form:"acmeEmail"`
 	CertFile  string `json:"certFile" form:"certFile"`
 	KeyFile   string `json:"keyFile" form:"keyFile"`
 	AuthUser  string `json:"authUser" form:"authUser"`
 	AuthPass  string `json:"authPass" form:"authPass"`
 	Padding   bool   `json:"padding" form:"padding" gorm:"default:true"`
-	LogLevel  string `json:"logLevel" form:"logLevel" gorm:"default:WARNING"`
-	ExtraArgs string `json:"extraArgs" form:"extraArgs"`
+	LogLevel  string `json:"logLevel" form:"logLevel" gorm:"default:WARN"`
+	ExtraArgs    string `json:"extraArgs" form:"extraArgs"`
+	UseRawConfig bool   `json:"useRawConfig" form:"useRawConfig" gorm:"default:false"`
+	RawConfig    string `json:"rawConfig" form:"rawConfig"`
 	CreatedAt int64  `json:"createdAt" gorm:"autoCreateTime"`
 	UpdatedAt int64  `json:"updatedAt" gorm:"autoUpdateTime"`
 }
