@@ -56,11 +56,23 @@ naive+https://USER:PASS@DOMAIN:PORT
 
 ## Quick Start
 
+Install this fork (with NaiveProxy support):
+
 ```bash
-bash <(curl -Ls https://raw.githubusercontent.com/mhsanaei/3x-ui/master/install.sh)
+bash <(curl -Ls https://raw.githubusercontent.com/elector1337/3x-ui-naive/feature/naive-proxy/install.sh)
 ```
 
-For full documentation, please visit the [project Wiki](https://github.com/MHSanaei/3x-ui/wiki).
+To build Caddy with `forward_proxy` automatically during install (skips the
+interactive prompt), set `NAIVE_INSTALL_CADDY=yes`:
+
+```bash
+NAIVE_INSTALL_CADDY=yes bash <(curl -Ls https://raw.githubusercontent.com/elector1337/3x-ui-naive/feature/naive-proxy/install.sh)
+```
+
+For full documentation of the upstream panel, please visit the
+[3x-ui project Wiki](https://github.com/MHSanaei/3x-ui/wiki). For the
+fork-specific bits, see [`docs/NAIVE.md`](./docs/NAIVE.md) and
+[`CHANGELOG.md`](./CHANGELOG.md).
 
 ## A Special Thanks to
 
