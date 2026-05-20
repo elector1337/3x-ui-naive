@@ -73,6 +73,173 @@ is_port_in_use() {
     return 1
 }
 
+# caddy_with_forwardproxy_works prints 0 on stdout and returns 0 if the given
+# binary is caddy AND knows the forward_proxy directive (i.e. built from the
+# klzgrad fork). returns non-zero otherwise. quiet.
+caddy_with_forwardproxy_works() {
+    local bin="$1"
+    [[ -x "$bin" ]] || return 1
+    "$bin" version >/dev/null 2>&1 || return 1
+    # probe: try to adapt a Caddyfile that uses forward_proxy. stderr from
+    # caddy contains "unrecognized directive: forward_proxy" if the plugin
+    # is missing.
+    local tmp
+    tmp=$(mktemp /tmp/naive-probe.XXXXXX.caddyfile)
+    cat > "$tmp" <<'EOF'
+:0 {
+    route {
+        forward_proxy {
+            basic_auth u p
+        }
+    }
+}
+EOF
+    local out
+    out=$("$bin" adapt --config "$tmp" --adapter caddyfile 2>&1)
+    rm -f "$tmp"
+    if echo "$out" | grep -q "unrecognized directive"; then
+        return 1
+    fi
+    return 0
+}
+
+# ensure_go_for_xcaddy checks for go >= 1.22. echoes nothing on success; on
+# failure prints guidance and returns 1.
+ensure_go_for_xcaddy() {
+    if ! command -v go >/dev/null 2>&1; then
+        echo -e "${yellow}Go toolchain not found. xcaddy needs Go 1.22+ to build Caddy.${plain}"
+        echo -e "${yellow}Install Go from https://go.dev/dl/ (or your distro), then re-run installer.${plain}"
+        return 1
+    fi
+    local v
+    v=$(go env GOVERSION 2>/dev/null | sed -E 's/^go//; s/-.*//')
+    if [[ -z "$v" ]]; then
+        echo -e "${yellow}Could not detect Go version, attempting build anyway.${plain}"
+        return 0
+    fi
+    # parse major.minor
+    local maj min
+    maj=$(echo "$v" | cut -d. -f1)
+    min=$(echo "$v" | cut -d. -f2)
+    if [[ "$maj" -lt 1 ]] || { [[ "$maj" -eq 1 ]] && [[ "$min" -lt 22 ]]; }; then
+        echo -e "${yellow}Go ${v} is too old; need 1.22+. Update from https://go.dev/dl/${plain}"
+        return 1
+    fi
+    return 0
+}
+
+# setup_caddy_capabilities grants the binary CAP_NET_BIND_SERVICE so it can
+# listen on ports <=1024 (e.g. 443) without running as root. best-effort:
+# silently no-op if setcap is unavailable.
+setup_caddy_capabilities() {
+    local bin="$1"
+    if command -v setcap >/dev/null 2>&1; then
+        setcap cap_net_bind_service=+ep "$bin" 2>/dev/null \
+            && echo -e "${green}Granted cap_net_bind_service to ${bin}${plain}" \
+            || echo -e "${yellow}setcap failed for ${bin}; running on port <=1024 may need root${plain}"
+    else
+        echo -e "${yellow}setcap not found; ${bin} will need root to bind ports <=1024${plain}"
+    fi
+}
+
+# install_caddy_naive builds caddy with the klzgrad/forwardproxy plugin via
+# xcaddy and drops it at ${xui_folder}/bin/caddy. idempotent: skips if a
+# working binary is already present.
+install_caddy_naive() {
+    local target_dir="${xui_folder}/bin"
+    local target="${target_dir}/caddy"
+
+    if caddy_with_forwardproxy_works "$target"; then
+        echo -e "${green}Caddy with forward_proxy already installed at ${target}${plain}"
+        setup_caddy_capabilities "$target"
+        return 0
+    fi
+    if caddy_with_forwardproxy_works "$(command -v caddy 2>/dev/null)"; then
+        echo -e "${green}Caddy with forward_proxy found in PATH; using it.${plain}"
+        return 0
+    fi
+
+    echo -e "${green}Building Caddy with forward_proxy plugin (this can take 1-3 minutes)...${plain}"
+
+    ensure_go_for_xcaddy || return 1
+
+    mkdir -p "$target_dir" || { echo -e "${red}Cannot create ${target_dir}${plain}"; return 1; }
+
+    # use a scratch dir so we don't pollute $HOME with go module cache
+    local work
+    work=$(mktemp -d /tmp/naive-build.XXXXXX)
+    local gobin="${work}/gobin"
+    mkdir -p "$gobin"
+
+    echo -e "${green}==> installing xcaddy${plain}"
+    GOBIN="$gobin" GOPATH="$work" go install github.com/caddyserver/xcaddy/cmd/xcaddy@latest
+    if [[ ! -x "${gobin}/xcaddy" ]]; then
+        echo -e "${red}Failed to install xcaddy${plain}"
+        rm -rf "$work"
+        return 1
+    fi
+
+    echo -e "${green}==> building caddy with forward_proxy plugin${plain}"
+    GOBIN="$gobin" GOPATH="$work" "${gobin}/xcaddy" build \
+        --with github.com/caddyserver/forwardproxy@caddy2=github.com/klzgrad/forwardproxy@naive \
+        --output "$target"
+    local rc=$?
+    rm -rf "$work"
+
+    if [[ $rc -ne 0 ]] || [[ ! -x "$target" ]]; then
+        echo -e "${red}Caddy build failed${plain}"
+        return 1
+    fi
+
+    chmod +x "$target"
+    if ! caddy_with_forwardproxy_works "$target"; then
+        echo -e "${red}Built binary doesn't recognize forward_proxy; something went wrong${plain}"
+        return 1
+    fi
+
+    echo -e "${green}Caddy with forward_proxy installed at ${target}${plain}"
+    setup_caddy_capabilities "$target"
+    return 0
+}
+
+# prompt_install_caddy asks whether to install Caddy now. can be skipped
+# non-interactively via env: NAIVE_INSTALL_CADDY=yes|no
+prompt_install_caddy() {
+    case "${NAIVE_INSTALL_CADDY:-}" in
+        yes|YES|y|Y|1|true)
+            install_caddy_naive
+            return $?
+            ;;
+        no|NO|n|N|0|false)
+            echo -e "${yellow}Skipped Caddy installation (NAIVE_INSTALL_CADDY=${NAIVE_INSTALL_CADDY}).${plain}"
+            echo -e "${yellow}You can install it later from the panel: /panel/naive -> Install.${plain}"
+            return 0
+            ;;
+    esac
+
+    if [[ ! -t 0 ]]; then
+        # non-interactive (e.g. piped from curl) and no env override -> skip
+        echo -e "${yellow}Non-interactive install; skipping Caddy build.${plain}"
+        echo -e "${yellow}To enable NaiveProxy later, open /panel/naive and click 'Install'.${plain}"
+        echo -e "${yellow}Or re-run installer with NAIVE_INSTALL_CADDY=yes.${plain}"
+        return 0
+    fi
+
+    echo -e ""
+    echo -e "${blue}NaiveProxy support in this fork requires Caddy with the forward_proxy plugin.${plain}"
+    echo -e "${blue}The panel can install it now via xcaddy (~1-3 min, needs Go 1.22+ on host).${plain}"
+    local ans
+    read -p "Install Caddy with forward_proxy now? [y/N]: " ans
+    case "${ans,,}" in
+        y|yes)
+            install_caddy_naive
+            ;;
+        *)
+            echo -e "${yellow}Skipped. You can install it later from /panel/naive.${plain}"
+            ;;
+    esac
+}
+
 install_base() {
     case "${release}" in
         ubuntu | debian | armbian)
@@ -1019,6 +1186,10 @@ install_x-ui() {
     fi
 
     echo -e "${green}x-ui ${tag_version}${plain} installation finished, it is running now..."
+
+    # NaiveProxy: optional Caddy build with forward_proxy plugin (this fork)
+    prompt_install_caddy
+
     echo -e ""
     echo -e "┌───────────────────────────────────────────────────────┐
 │  ${blue}x-ui control menu usages (subcommands):${plain}              │

@@ -50,6 +50,7 @@ naive+https://USER:PASS@DOMAIN:PORT
 ```
 
 **Full setup, API reference and configuration details:** see [`docs/NAIVE.md`](./docs/NAIVE.md).
+**What's different from upstream 3x-ui:** see [`CHANGELOG.md`](./CHANGELOG.md).
 
 ---
 
