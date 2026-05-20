@@ -1,5 +1,11 @@
 package model
 
+import (
+	"github.com/mhsanaei/3x-ui/v3/util/crypto"
+
+	"gorm.io/gorm"
+)
+
 // naive proxy server (runs as external process, not an xray protocol)
 type NaiveServer struct {
 	Id        int    `json:"id" form:"id" gorm:"primaryKey;autoIncrement"`
@@ -24,3 +30,26 @@ type NaiveServer struct {
 }
 
 func (NaiveServer) TableName() string { return "naive_servers" }
+
+// BeforeSave encrypts the AuthPass field before write so the on-disk
+// SQLite row never contains the plain credential. Idempotent: skips
+// already-encrypted values.
+func (s *NaiveServer) BeforeSave(_ *gorm.DB) error {
+	enc, err := crypto.EncryptString(s.AuthPass)
+	if err != nil {
+		return err
+	}
+	s.AuthPass = enc
+	return nil
+}
+
+// AfterFind decrypts AuthPass back to plaintext for downstream consumers
+// (Caddyfile generator, REST API responses, etc.).
+func (s *NaiveServer) AfterFind(_ *gorm.DB) error {
+	dec, err := crypto.DecryptString(s.AuthPass)
+	if err != nil {
+		return err
+	}
+	s.AuthPass = dec
+	return nil
+}

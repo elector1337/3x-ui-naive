@@ -57,6 +57,20 @@ Based on upstream commit [`f9ae0347`](https://github.com/MHSanaei/3x-ui/commit/f
   - `naive_cross_port_test.go` — cross-port collisions in both
     directions with realistic seed data.
 
+#### AuthPass encryption at rest
+
+- `util/crypto/crypto.go` — AES-256-GCM helpers `EncryptString` /
+  `DecryptString` with idempotent `enc:v1:` prefix.
+- 32-byte AES key auto-generated on first start, stored at
+  `<db_folder>/encryption.key` (mode `0600`, base64-encoded).
+- gorm hooks `BeforeSave` / `AfterFind` on `NaiveServer` transparently
+  encrypt / decrypt `AuthPass`.
+- Service-layer round-trip helper restores plaintext after `Create` /
+  `Save` so API responses keep returning the original value.
+- Legacy plaintext rows are auto-tolerated and re-encrypted on next save.
+- Tests cover roundtrip, idempotence, legacy passthrough, file
+  permissions, key-rotation failure.
+
 #### install.sh integration
 
 - New helpers (`install.sh`):
@@ -93,6 +107,7 @@ Based on upstream commit [`f9ae0347`](https://github.com/MHSanaei/3x-ui/commit/f
 ### Files added
 
 ```
+CHANGELOG.md
 database/model/naive.go
 docs/NAIVE.md
 frontend/naive.html
@@ -106,12 +121,14 @@ web/service/naive_cross_port.go
 web/service/naive_cross_port_test.go
 web/service/naive_installer.go
 web/service/naive_test.go
+util/crypto/crypto_test.go
 ```
 
 ### Files modified
 
 ```
 database/db.go                              # register NaiveServer migration
+util/crypto/crypto.go                       # AES-256-GCM helpers + keyfile
 frontend/src/components/AppSidebar.vue      # add Naive entry to sidebar
 frontend/vite.config.js                     # register naive entry + redirect
 install.sh                                  # Caddy install integration

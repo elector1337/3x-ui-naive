@@ -71,6 +71,16 @@ func (s *NaiveService) Get(id int) (*model.NaiveServer, error) {
 	return row, nil
 }
 
+// roundTripAuthPass restores the plaintext AuthPass after a write so callers
+// (and JSON responses) keep seeing the original value — gorm BeforeSave
+// encrypted the in-memory struct, which is correct for the DB but wrong for
+// the API response.
+func roundTripAuthPass(srv *model.NaiveServer, original string) {
+	if srv != nil {
+		srv.AuthPass = original
+	}
+}
+
 func (s *NaiveService) Add(srv *model.NaiveServer) error {
 	if err := validateNaive(srv); err != nil {
 		return err
@@ -80,7 +90,12 @@ func (s *NaiveService) Add(srv *model.NaiveServer) error {
 			return err
 		}
 	}
-	return database.GetDB().Create(srv).Error
+	plain := srv.AuthPass
+	if err := database.GetDB().Create(srv).Error; err != nil {
+		return err
+	}
+	roundTripAuthPass(srv, plain)
+	return nil
 }
 
 func (s *NaiveService) Update(srv *model.NaiveServer) error {
@@ -92,7 +107,12 @@ func (s *NaiveService) Update(srv *model.NaiveServer) error {
 			return err
 		}
 	}
-	return database.GetDB().Save(srv).Error
+	plain := srv.AuthPass
+	if err := database.GetDB().Save(srv).Error; err != nil {
+		return err
+	}
+	roundTripAuthPass(srv, plain)
+	return nil
 }
 
 func (s *NaiveService) Delete(id int) error {
