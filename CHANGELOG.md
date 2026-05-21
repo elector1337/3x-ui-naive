@@ -57,6 +57,33 @@ Based on upstream commit [`f9ae0347`](https://github.com/MHSanaei/3x-ui/commit/f
   - `naive_cross_port_test.go` — cross-port collisions in both
     directions with realistic seed data.
 
+#### Reliability & observability
+
+- `NaiveService.Restore()` now starts all `enable=true` servers in parallel
+  goroutines with a `sync.WaitGroup`; on a 3-server bench restore time drops
+  from sequential to ~5 ms. A `recover()` per goroutine keeps a runaway
+  panic from killing the panel.
+- New `responding` field in `NaiveStatus`: HTTPS HEAD probe (1s timeout,
+  `InsecureSkipVerify`) against `127.0.0.1:port` after the TCP probe.
+  Lets the UI distinguish «socket open but caddy hung» from «socket open
+  and TLS responds».
+- UI now shows three running-state colours: green «Running»
+  (running + listening + responding), yellow «Unresponsive»
+  (running + listening, but no TLS reply), blue «Starting…»
+  (running, port not yet open).
+
+#### Integration tests
+
+- `testdata/mock_caddy/` — tiny Go binary that mimics caddy's CLI surface
+  (`version`, `adapt`, `run --config X.caddyfile --adapter caddyfile`)
+  and serves a self-signed TLS endpoint on the port from the Caddyfile.
+- `naive_lifecycle_test.go`:
+  - `TestNaiveLifecycle_Integration` — full add → start → wait for
+    Listening + Responding → stop → wait for reap → restart. Catches
+    regressions in the proc map, reaper goroutine and probe logic.
+  - `TestNaiveRestore_ParallelStartsAllEnabledRows` — three servers
+    added, `Restore()` called once, all become listening.
+
 #### AuthPass encryption at rest
 
 - `util/crypto/crypto.go` — AES-256-GCM helpers `EncryptString` /
@@ -120,7 +147,9 @@ web/service/naive.go
 web/service/naive_cross_port.go
 web/service/naive_cross_port_test.go
 web/service/naive_installer.go
+web/service/naive_lifecycle_test.go
 web/service/naive_test.go
+web/service/testdata/mock_caddy/main.go
 util/crypto/crypto_test.go
 ```
 

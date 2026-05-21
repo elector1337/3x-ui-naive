@@ -407,6 +407,7 @@
       "disabled": "Off",
       "running": "Running",
       "starting": "Starting…",
+      "unresponsive": "Unresponsive",
       "stopped": "Stopped",
       "start": "Start",
       "stop": "Stop",

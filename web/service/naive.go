@@ -2,9 +2,11 @@ package service
 
 import (
 	"context"
+	"crypto/tls"
 	"errors"
 	"fmt"
 	"net"
+	"net/http"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -30,12 +32,13 @@ var (
 )
 
 type NaiveStatus struct {
-	Id        int    `json:"id"`
-	Running   bool   `json:"running"`
-	Pid       int    `json:"pid,omitempty"`
-	Since     int64  `json:"since,omitempty"`
-	LogPath   string `json:"logPath,omitempty"`
-	Listening bool   `json:"listening"`
+	Id         int    `json:"id"`
+	Running    bool   `json:"running"`
+	Pid        int    `json:"pid,omitempty"`
+	Since      int64  `json:"since,omitempty"`
+	LogPath    string `json:"logPath,omitempty"`
+	Listening  bool   `json:"listening"`
+	Responding bool   `json:"responding"`
 }
 
 type naiveProc struct {
@@ -149,7 +152,33 @@ func (s *NaiveService) Status(id int) NaiveStatus {
 			st.Listening = true
 		}
 	}
+	// HTTPS-level probe — TLS handshake completes ⇒ caddy is actually serving.
+	// We don't care about the response body; forward_proxy returns 4xx/5xx
+	// on plain HEAD, which still proves the server is alive.
+	if st.Listening {
+		st.Responding = probeHTTPS(port)
+	}
 	return st
+}
+
+// probeHTTPS does a 1s HTTPS HEAD against 127.0.0.1:port skipping certificate
+// verification (the cert is for the public domain, not localhost). Returns
+// true if either the TLS handshake or an HTTP response came back.
+func probeHTTPS(port int) bool {
+	client := &http.Client{
+		Timeout: 1 * time.Second,
+		Transport: &http.Transport{
+			TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
+		},
+	}
+	url := fmt.Sprintf("https://127.0.0.1:%d/", port)
+	req, _ := http.NewRequest(http.MethodHead, url, nil)
+	resp, err := client.Do(req)
+	if err == nil {
+		_ = resp.Body.Close()
+		return true
+	}
+	return false
 }
 
 func (s *NaiveService) Start(id int) error {
@@ -251,14 +280,25 @@ func (s *NaiveService) Restore() {
 		logger.Warningf("naive restore: %v", err)
 		return
 	}
+	var wg sync.WaitGroup
 	for _, srv := range rows {
 		if !srv.Enable {
 			continue
 		}
-		if err := s.Start(srv.Id); err != nil {
-			logger.Warningf("naive restore %d: %v", srv.Id, err)
-		}
+		wg.Add(1)
+		go func(id int) {
+			defer wg.Done()
+			defer func() {
+				if r := recover(); r != nil {
+					logger.Warningf("naive restore %d: panic %v", id, r)
+				}
+			}()
+			if err := s.Start(id); err != nil {
+				logger.Warningf("naive restore %d: %v", id, err)
+			}
+		}(srv.Id)
 	}
+	wg.Wait()
 }
 
 func validateNaive(srv *model.NaiveServer) error {

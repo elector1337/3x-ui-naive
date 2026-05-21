@@ -251,9 +251,13 @@ const columns = computed(() => [
                       <div class="srv-head">
                         <div class="srv-title">{{ srv.remark || `naive-${srv.id}` }}</div>
                         <a-tag
-                          v-if="isRunning(srv.id) && statuses[srv.id]?.listening"
+                          v-if="isRunning(srv.id) && statuses[srv.id]?.listening && statuses[srv.id]?.responding"
                           color="success"
                         >{{ t('pages.naive.running') }}</a-tag>
+                        <a-tag
+                          v-else-if="isRunning(srv.id) && statuses[srv.id]?.listening"
+                          color="warning"
+                        >{{ t('pages.naive.unresponsive') }}</a-tag>
                         <a-tag v-else-if="isRunning(srv.id)" color="processing">{{ t('pages.naive.starting') }}</a-tag>
                         <a-tag v-else color="default">{{ t('pages.naive.stopped') }}</a-tag>
                       </div>
@@ -324,10 +328,16 @@ const columns = computed(() => [
 
                       <template v-else-if="column.key === 'status'">
                         <a-tag
-                          v-if="isRunning(record.id) && statuses[record.id]?.listening"
+                          v-if="isRunning(record.id) && statuses[record.id]?.listening && statuses[record.id]?.responding"
                           color="success"
                         >
                           {{ t('pages.naive.running') }}
+                        </a-tag>
+                        <a-tag
+                          v-else-if="isRunning(record.id) && statuses[record.id]?.listening"
+                          color="warning"
+                        >
+                          {{ t('pages.naive.unresponsive') }}
                         </a-tag>
                         <a-tag v-else-if="isRunning(record.id)" color="processing">
                           {{ t('pages.naive.starting') }}
