@@ -57,6 +57,17 @@ Based on upstream commit [`f9ae0347`](https://github.com/MHSanaei/3x-ui/commit/f
   - `naive_cross_port_test.go` — cross-port collisions in both
     directions with realistic seed data.
 
+#### Docker image with bundled Caddy
+
+- New `caddy-builder` stage in the Dockerfile uses xcaddy with
+  `CGO_ENABLED=0` to cross-compile Caddy + `klzgrad/forwardproxy`
+  for the target architecture (amd64 / arm64 / arm/v7 / arm/v6 / 386).
+- Resulting binary is copied to `/app/bin/caddy` in the final image —
+  the panel's `findCaddy()` discovers it automatically on first start.
+- `docker pull ghcr.io/elector1337/3x-ui-naive:latest` is now truly
+  out-of-the-box: NaiveProxy works without an extra Install Caddy step.
+- Image grows by ~50 MB (Caddy is statically linked, pure Go, no CGO).
+
 #### Auth field validation
 
 - `validateNaive()` now rejects forbidden characters in `AuthUser` and

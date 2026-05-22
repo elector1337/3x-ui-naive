@@ -9,18 +9,21 @@ Naive-сервер — это Caddy с плагином `forward_proxy` (фор�
 ## Установка Caddy
 
 Нужен бинарь Caddy **с плагином forward_proxy** — стандартный `caddy` из
-дистрибутива не подойдёт. Есть четыре варианта в порядке предпочтения:
+дистрибутива не подойдёт. Есть пять вариантов в порядке предпочтения:
 
-1. **Через install.sh** (для свежей установки панели). Скрипт спросит
+1. **Docker-образ** `ghcr.io/elector1337/3x-ui-naive` уже содержит готовый
+   Caddy с плагином в `/app/bin/caddy` — ничего дополнительно ставить
+   не нужно. Просто `docker pull ghcr.io/elector1337/3x-ui-naive:latest`.
+2. **Через install.sh** (для свежей установки панели). Скрипт спросит
    «Install Caddy with forward_proxy now?» и сам выполнит сборку через
    xcaddy. Можно автоматизировать: `NAIVE_INSTALL_CADDY=yes bash <(curl ...)`.
-2. **Через панель**. Откройте `/panel/naive` — если caddy не найден, появится
+3. **Через панель**. Откройте `/panel/naive` — если caddy не найден, появится
    жёлтый баннер «Caddy не установлен» и кнопка **Install**. Панель запустит
    `xcaddy build` с нужным плагином и положит бинарь в `<bin>/caddy`.
    Требует Go 1.22+ на хосте; сборка занимает 1–3 минуты, лог идёт live
    по SSE.
-3. **Готовый бинарь из релизов klzgrad/naiveproxy** (положить в `$PATH`).
-4. **Самостоятельная сборка** через `xcaddy build --with github.com/caddyserver/forwardproxy@caddy2=github.com/klzgrad/forwardproxy@naive`.
+4. **Готовый бинарь из релизов klzgrad/naiveproxy** (положить в `$PATH`).
+5. **Самостоятельная сборка** через `xcaddy build --with github.com/caddyserver/forwardproxy@caddy2=github.com/klzgrad/forwardproxy@naive`.
 
 Поиск бинаря (в этом порядке): `CADDY_BIN` → `<bin>/caddy` → `caddy` в PATH.
 
