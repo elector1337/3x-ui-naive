@@ -84,6 +84,10 @@ export function useNaive() {
 
   // installCaddy posts to the SSE endpoint and resolves after the build finishes.
   // Returns { ok, log } — the full xcaddy output for display.
+  async function fetchLog(id, tail = 200) {
+    return HttpUtil.get(`/panel/api/naive/log/${id}?tail=${tail}`);
+  }
+
   async function previewCaddyfile(payload) {
     return HttpUtil.post('/panel/api/naive/preview', payload);
   }
@@ -133,6 +137,7 @@ export function useNaive() {
     installCaddy,
     previewCaddyfile,
     validateCaddyfile,
+    fetchLog,
     create,
     update,
     remove,

@@ -34,6 +34,7 @@ func (a *NaiveController) initRouter(g *gin.RouterGroup) {
 	g.POST("/update/:id", a.update)
 	g.POST("/delete/:id", a.delete)
 	g.GET("/status/:id", a.status)
+	g.GET("/log/:id", a.log)
 	g.POST("/start/:id", a.start)
 	g.POST("/stop/:id", a.stop)
 	g.POST("/restart/:id", a.restart)
@@ -134,6 +135,20 @@ func (a *NaiveController) status(c *gin.Context) {
 		return
 	}
 	jsonObj(c, a.svc.Status(id), nil)
+}
+
+func (a *NaiveController) log(c *gin.Context) {
+	id, ok := parseID(c)
+	if !ok {
+		return
+	}
+	tail, _ := strconv.Atoi(c.Query("tail"))
+	text, err := a.svc.Log(id, tail)
+	if err != nil {
+		jsonMsg(c, "", err)
+		return
+	}
+	jsonObj(c, text, nil)
 }
 
 func (a *NaiveController) start(c *gin.Context) {

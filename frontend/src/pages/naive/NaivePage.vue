@@ -8,6 +8,7 @@ import {
   PauseCircleOutlined,
   ReloadOutlined,
   EditOutlined,
+  FileTextOutlined,
   DeleteOutlined,
   CopyOutlined,
   CloudServerOutlined,
@@ -33,6 +34,7 @@ const {
   caddy,
   refresh,
   installCaddy,
+  fetchLog,
   create,
   update,
   remove,
@@ -106,6 +108,32 @@ async function onStop(s) {
   const msg = await stop(s.id);
   if (msg?.success) message.success(t('pages.naive.toasts.stopped'));
 }
+const logOpen = ref(false);
+const logTarget = ref(null);
+const logText = ref('');
+const logLoading = ref(false);
+
+async function onShowLog(srv) {
+  logTarget.value = srv;
+  logOpen.value = true;
+  await reloadLog();
+}
+
+async function reloadLog() {
+  if (!logTarget.value) return;
+  logLoading.value = true;
+  try {
+    const res = await fetchLog(logTarget.value.id, 200);
+    if (res?.success) {
+      logText.value = res.obj || '';
+    } else {
+      logText.value = res?.msg || t('pages.naive.logError');
+    }
+  } finally {
+    logLoading.value = false;
+  }
+}
+
 async function onRestart(s) {
   const msg = await restart(s.id);
   if (msg?.success) message.success(t('pages.naive.toasts.restarted'));
@@ -291,6 +319,9 @@ const columns = computed(() => [
                         <a-button size="small" :disabled="!isRunning(srv.id)" @click="onRestart(srv)">
                           <template #icon><ReloadOutlined /></template>
                         </a-button>
+                        <a-button size="small" @click="onShowLog(srv)">
+                          <template #icon><FileTextOutlined /></template>
+                        </a-button>
                         <a-button size="small" @click="onEdit(srv)">
                           <template #icon><EditOutlined /></template>
                         </a-button>
@@ -370,6 +401,11 @@ const columns = computed(() => [
                               <template #icon><ReloadOutlined /></template>
                             </a-button>
                           </a-tooltip>
+                          <a-tooltip :title="t('pages.naive.viewLog')">
+                            <a-button size="small" @click="onShowLog(record)">
+                              <template #icon><FileTextOutlined /></template>
+                            </a-button>
+                          </a-tooltip>
                           <a-button size="small" @click="onEdit(record)">
                             <template #icon><EditOutlined /></template>
                           </a-button>
@@ -397,6 +433,22 @@ const columns = computed(() => [
         :server="formServer"
         @save="onSave"
       />
+
+      <a-modal
+        v-model:open="logOpen"
+        :title="t('pages.naive.logTitle', { name: logTarget?.remark || `naive-${logTarget?.id}` })"
+        width="780px"
+        :footer="null"
+      >
+        <a-space style="margin-bottom: 8px;">
+          <a-button :loading="logLoading" size="small" @click="reloadLog">
+            <template #icon><ReloadOutlined /></template>
+            {{ t('refresh') }}
+          </a-button>
+          <span class="log-hint">{{ t('pages.naive.logHint') }}</span>
+        </a-space>
+        <pre class="log-view">{{ logText || t('pages.naive.logEmpty') }}</pre>
+      </a-modal>
     </a-layout>
   </a-config-provider>
 </template>
@@ -523,5 +575,28 @@ const columns = computed(() => [
 
 .srv-actions {
   margin-top: 8px;
+}
+
+.log-view {
+  max-height: 480px;
+  overflow: auto;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 12px;
+  line-height: 1.4;
+  background: rgba(0, 0, 0, 0.04);
+  padding: 10px 12px;
+  border-radius: 4px;
+  margin: 0;
+  white-space: pre-wrap;
+  word-break: break-all;
+}
+
+.naive-page.is-dark .log-view {
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.log-hint {
+  font-size: 11px;
+  opacity: 0.6;
 }
 </style>

@@ -57,6 +57,29 @@ Based on upstream commit [`f9ae0347`](https://github.com/MHSanaei/3x-ui/commit/f
   - `naive_cross_port_test.go` — cross-port collisions in both
     directions with realistic seed data.
 
+#### Auth field validation
+
+- `validateNaive()` now rejects forbidden characters in `AuthUser` and
+  `AuthPass`: whitespace (Caddyfile token separator), control chars,
+  and Caddyfile metacharacters `"`, `\`, `#`.
+- `AuthUser` additionally rejects `:` (reserved as user/password
+  separator in the `naive+https://USER:PASS@HOST` client URL).
+- Length capped at 64 chars for user and 128 for pass.
+- Error messages name the offending character (`auth pass contains
+  forbidden character space`).
+- 14 new sub-tests under `TestValidateNaive_AuthCharsetRejection`.
+
+#### Naive logs in the UI
+
+- New endpoint `GET /panel/api/naive/log/:id?tail=200` — returns last
+  N lines from the per-server log file. Default 200, max 1000. Reads
+  only the last 256 KiB of the file from disk.
+- UI: «Show log» button (file-text icon) added to the action column
+  in both desktop table and mobile card view.
+- Modal with monospaced log view, refresh button, dark-theme styling.
+- New i18n keys: `pages.naive.viewLog`, `logTitle`, `logEmpty`,
+  `logHint`, `logError`.
+
 #### Reliability & observability
 
 - `NaiveService.Restore()` now starts all `enable=true` servers in parallel

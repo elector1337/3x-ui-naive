@@ -5,6 +5,7 @@ import (
 	"crypto/tls"
 	"errors"
 	"fmt"
+	"io"
 	"net"
 	"net/http"
 	"os"
@@ -274,6 +275,61 @@ func (s *NaiveService) Restart(id int) error {
 	return s.Start(id)
 }
 
+// Log returns the last `tail` lines from the per-server log file. The default
+// is 200 lines; the cap of 1000 guards against accidentally tailing the
+// whole file if someone passes a huge value. The reader only reads the last
+// 256 KiB of the file from disk, so it's cheap even when the log is large.
+func (s *NaiveService) Log(id, tail int) (string, error) {
+	if tail <= 0 {
+		tail = 200
+	}
+	if tail > 1000 {
+		tail = 1000
+	}
+	dir, err := ensureNaiveDir()
+	if err != nil {
+		return "", err
+	}
+	path := filepath.Join(dir, fmt.Sprintf("naive-%d.log", id))
+	return tailLogFile(path, tail)
+}
+
+func tailLogFile(path string, n int) (string, error) {
+	f, err := os.Open(path)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return "", nil // no log yet — return empty, not an error
+		}
+		return "", err
+	}
+	defer f.Close()
+
+	const maxRead int64 = 256 * 1024
+	info, err := f.Stat()
+	if err != nil {
+		return "", err
+	}
+	if info.Size() == 0 {
+		return "", nil
+	}
+	var start int64
+	if info.Size() > maxRead {
+		start = info.Size() - maxRead
+	}
+	if _, err := f.Seek(start, io.SeekStart); err != nil {
+		return "", err
+	}
+	data, err := io.ReadAll(f)
+	if err != nil {
+		return "", err
+	}
+	lines := strings.Split(strings.TrimRight(string(data), "\n"), "\n")
+	if len(lines) > n {
+		lines = lines[len(lines)-n:]
+	}
+	return strings.Join(lines, "\n"), nil
+}
+
 func (s *NaiveService) Restore() {
 	rows, err := s.List()
 	if err != nil {
@@ -320,6 +376,18 @@ func validateNaive(srv *model.NaiveServer) error {
 	}
 	if strings.TrimSpace(srv.AuthUser) == "" || strings.TrimSpace(srv.AuthPass) == "" {
 		return fmt.Errorf("%w: auth required", ErrNaiveInvalidConfig)
+	}
+	if bad := badAuthChar(srv.AuthUser); bad != "" {
+		return fmt.Errorf("%w: auth user contains forbidden character %s", ErrNaiveInvalidConfig, bad)
+	}
+	if bad := badAuthChar(srv.AuthPass); bad != "" {
+		return fmt.Errorf("%w: auth pass contains forbidden character %s", ErrNaiveInvalidConfig, bad)
+	}
+	if strings.ContainsRune(srv.AuthUser, ':') {
+		return fmt.Errorf("%w: auth user cannot contain ':' (reserved as user/password separator in client URL)", ErrNaiveInvalidConfig)
+	}
+	if len(srv.AuthUser) > 64 || len(srv.AuthPass) > 128 {
+		return fmt.Errorf("%w: auth user/pass too long (max 64 / 128)", ErrNaiveInvalidConfig)
 	}
 	if srv.UseACME {
 		if strings.TrimSpace(srv.AcmeEmail) == "" {
@@ -423,6 +491,32 @@ func renderNaiveCaddyfile(srv *model.NaiveServer) string {
 	b.WriteString("}\n")
 
 	return b.String()
+}
+
+// badAuthChar returns a human-readable description of the first forbidden
+// character in s, or "" if all characters are safe. Forbidden:
+// whitespace (Caddyfile token separator), control chars, and Caddyfile
+// metacharacters ", \, #.
+func badAuthChar(s string) string {
+	for _, r := range s {
+		switch {
+		case r == ' ':
+			return "space"
+		case r == '\t':
+			return "tab"
+		case r == '\n' || r == '\r':
+			return "newline"
+		case r == '"':
+			return `"`
+		case r == '\\':
+			return `\`
+		case r == '#':
+			return "#"
+		case r < 0x20 || r == 0x7F:
+			return fmt.Sprintf("control U+%04X", r)
+		}
+	}
+	return ""
 }
 
 func firstNonEmpty(vals ...string) string {

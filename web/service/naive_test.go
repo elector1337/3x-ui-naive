@@ -117,6 +117,48 @@ func TestWriteNaiveConfig_RawMode(t *testing.T) {
 	}
 }
 
+func TestValidateNaive_AuthCharsetRejection(t *testing.T) {
+	base := func() *model.NaiveServer {
+		return &model.NaiveServer{
+			Port: 443, Domain: "x", AuthUser: "u", AuthPass: "p",
+			CertFile: "a", KeyFile: "b",
+		}
+	}
+	cases := []struct {
+		name  string
+		mutate func(*model.NaiveServer)
+		wantOK bool
+	}{
+		{"ok plain", func(s *model.NaiveServer) {}, true},
+		{"ok special punctuation", func(s *model.NaiveServer) { s.AuthPass = "P@$$w0rd!" }, true},
+		{"reject space in user", func(s *model.NaiveServer) { s.AuthUser = "us er" }, false},
+		{"reject space in pass", func(s *model.NaiveServer) { s.AuthPass = "pa ss" }, false},
+		{"reject colon in user", func(s *model.NaiveServer) { s.AuthUser = "us:er" }, false},
+		{"colon in pass is ok", func(s *model.NaiveServer) { s.AuthPass = "p:ass" }, true},
+		{"reject tab", func(s *model.NaiveServer) { s.AuthPass = "p\tass" }, false},
+		{"reject newline", func(s *model.NaiveServer) { s.AuthPass = "p\nass" }, false},
+		{"reject quote", func(s *model.NaiveServer) { s.AuthPass = `pa"ss` }, false},
+		{"reject backslash", func(s *model.NaiveServer) { s.AuthPass = `pa\ss` }, false},
+		{"reject hash", func(s *model.NaiveServer) { s.AuthPass = "pa#ss" }, false},
+		{"reject control char", func(s *model.NaiveServer) { s.AuthPass = "pa\x01ss" }, false},
+		{"reject too-long user", func(s *model.NaiveServer) { s.AuthUser = strings.Repeat("u", 65) }, false},
+		{"reject too-long pass", func(s *model.NaiveServer) { s.AuthPass = strings.Repeat("p", 129) }, false},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			srv := base()
+			tc.mutate(srv)
+			err := validateNaive(srv)
+			if tc.wantOK && err != nil {
+				t.Errorf("expected ok, got %v", err)
+			}
+			if !tc.wantOK && err == nil {
+				t.Errorf("expected reject, got nil")
+			}
+		})
+	}
+}
+
 func TestValidateNaive_RawMode(t *testing.T) {
 	if err := validateNaive(&model.NaiveServer{UseRawConfig: true, RawConfig: "  "}); err == nil {
 		t.Errorf("empty raw should fail")
