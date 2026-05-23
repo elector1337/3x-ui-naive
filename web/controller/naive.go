@@ -18,9 +18,12 @@ type NaiveController struct {
 	installer *service.CaddyInstaller
 }
 
-func NewNaiveController(g *gin.RouterGroup) *NaiveController {
+// NewNaiveController takes the NaiveService instance owned by the web layer.
+// Passing it explicitly (instead of grabbing a global) keeps the controller
+// trivially testable with a stand-in service.
+func NewNaiveController(g *gin.RouterGroup, naive *service.NaiveService) *NaiveController {
 	a := &NaiveController{
-		svc:       service.GetNaiveService(),
+		svc:       naive,
 		installer: service.NewCaddyInstaller(),
 	}
 	a.initRouter(g)

@@ -576,6 +576,100 @@ export const sections = [
   },
 
   {
+    id: 'naive',
+    title: 'NaiveProxy',
+    description:
+      'Manage NaiveProxy (Caddy + forward_proxy) servers as panel-managed child processes. All endpoints under /panel/api/naive.',
+    endpoints: [
+      {
+        method: 'GET',
+        path: '/panel/api/naive/list',
+        summary: 'List every configured naive server.',
+      },
+      {
+        method: 'GET',
+        path: '/panel/api/naive/get/:id',
+        summary: 'Fetch a single naive server by ID.',
+        params: [{ name: 'id', in: 'path', type: 'number', desc: 'Server ID.' }],
+      },
+      {
+        method: 'POST',
+        path: '/panel/api/naive/add',
+        summary: 'Create a new naive server. Cross-checks port against existing xray inbounds and other naive servers. Encrypts authPass at rest.',
+        body: '{\n  "remark": "naive-1",\n  "enable": true,\n  "port": 443,\n  "domain": "naive.example.com",\n  "useAcme": true,\n  "acmeEmail": "you@example.com",\n  "authUser": "alice",\n  "authPass": "s3cret",\n  "padding": true,\n  "logLevel": "WARN"\n}',
+      },
+      {
+        method: 'POST',
+        path: '/panel/api/naive/update/:id',
+        summary: 'Update an existing naive server. Restarts the running process if it was started.',
+        params: [{ name: 'id', in: 'path', type: 'number', desc: 'Server ID.' }],
+      },
+      {
+        method: 'POST',
+        path: '/panel/api/naive/delete/:id',
+        summary: 'Stop the running process (if any) and delete the row.',
+        params: [{ name: 'id', in: 'path', type: 'number', desc: 'Server ID.' }],
+      },
+      {
+        method: 'GET',
+        path: '/panel/api/naive/status/:id',
+        summary: 'Runtime status of a naive server: PID, uptime, TCP listening, HTTPS responding.',
+        params: [{ name: 'id', in: 'path', type: 'number', desc: 'Server ID.' }],
+        response: '{\n  "success": true,\n  "obj": {\n    "id": 1,\n    "running": true,\n    "pid": 12345,\n    "since": 1700000000,\n    "logPath": "/etc/x-ui/naive/naive-1.log",\n    "listening": true,\n    "responding": true\n  }\n}',
+      },
+      {
+        method: 'GET',
+        path: '/panel/api/naive/log/:id',
+        summary: 'Tail the per-server log file. Reads only the last 256 KiB of disk and returns up to N lines.',
+        params: [
+          { name: 'id', in: 'path', type: 'number', desc: 'Server ID.' },
+          { name: 'tail', in: 'query', type: 'number', desc: 'Number of trailing lines, default 200, max 1000.' },
+        ],
+      },
+      {
+        method: 'POST',
+        path: '/panel/api/naive/start/:id',
+        summary: 'Start the Caddy process for this server.',
+        params: [{ name: 'id', in: 'path', type: 'number', desc: 'Server ID.' }],
+      },
+      {
+        method: 'POST',
+        path: '/panel/api/naive/stop/:id',
+        summary: 'SIGTERM the Caddy process (SIGKILL fallback).',
+        params: [{ name: 'id', in: 'path', type: 'number', desc: 'Server ID.' }],
+      },
+      {
+        method: 'POST',
+        path: '/panel/api/naive/restart/:id',
+        summary: 'Stop then start in one call. Waits briefly so the port is released.',
+        params: [{ name: 'id', in: 'path', type: 'number', desc: 'Server ID.' }],
+      },
+      {
+        method: 'GET',
+        path: '/panel/api/naive/caddy-status',
+        summary: 'Where the panel found a usable Caddy binary, its version, and whether Go is available for building.',
+        response: '{\n  "success": true,\n  "obj": {\n    "installed": true,\n    "path": "/etc/x-ui/bin/caddy",\n    "source": "panel",\n    "version": "v2.x.x",\n    "goPresent": true\n  }\n}',
+      },
+      {
+        method: 'POST',
+        path: '/panel/api/naive/install-caddy',
+        summary: 'Build a Caddy binary with the forward_proxy plugin via xcaddy. Streams progress as Server-Sent Events.',
+      },
+      {
+        method: 'POST',
+        path: '/panel/api/naive/preview',
+        summary: 'Render the Caddyfile the panel would write for the given form values.',
+      },
+      {
+        method: 'POST',
+        path: '/panel/api/naive/validate',
+        summary: 'Validate a Caddyfile via caddy adapt. Returns ok or a parser error with line number.',
+        body: '{\n  "text": ":443, example.com {\\n  ...\\n}\\n"\n}',
+      },
+    ],
+  },
+
+  {
     id: 'custom-geo',
     title: 'Custom Geo',
     description:

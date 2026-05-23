@@ -24,9 +24,9 @@ type APIController struct {
 }
 
 // NewAPIController creates a new APIController instance and initializes its routes.
-func NewAPIController(g *gin.RouterGroup, customGeo *service.CustomGeoService) *APIController {
+func NewAPIController(g *gin.RouterGroup, customGeo *service.CustomGeoService, naive *service.NaiveService) *APIController {
 	a := &APIController{}
-	a.initRouter(g, customGeo)
+	a.initRouter(g, customGeo, naive)
 	return a
 }
 
@@ -55,7 +55,7 @@ func (a *APIController) checkAPIAuth(c *gin.Context) {
 }
 
 // initRouter sets up the API routes for inbounds, server, and other endpoints.
-func (a *APIController) initRouter(g *gin.RouterGroup, customGeo *service.CustomGeoService) {
+func (a *APIController) initRouter(g *gin.RouterGroup, customGeo *service.CustomGeoService, naive *service.NaiveService) {
 	// Main API group
 	api := g.Group("/panel/api")
 	api.Use(a.checkAPIAuth)
@@ -76,7 +76,7 @@ func (a *APIController) initRouter(g *gin.RouterGroup, customGeo *service.Custom
 	NewCustomGeoController(api.Group("/custom-geo"), customGeo)
 
 	// NaiveProxy management API
-	NewNaiveController(api.Group("/naive"))
+	NewNaiveController(api.Group("/naive"), naive)
 
 	// Extra routes
 	api.POST("/backuptotgbot", a.BackuptoTgbot)

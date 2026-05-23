@@ -57,6 +57,18 @@ Based on upstream commit [`f9ae0347`](https://github.com/MHSanaei/3x-ui/commit/f
   - `naive_cross_port_test.go` — cross-port collisions in both
     directions with realistic seed data.
 
+#### Cleanup: dependency injection + reaper hardening
+
+- Removed the package-level `naiveSvc` singleton. `NewNaiveService()`
+  is now the only constructor; the web layer owns one instance and
+  passes it into `NewAPIController` → `NewNaiveController` and into the
+  boot-time `Restore()` call.
+- Reaper goroutine in `Start()` now has a `defer recover()` so a
+  panic inside `cmd.Wait()` / log close / map cleanup can't take the
+  whole panel down (it logs and exits the goroutine instead).
+- `api_docs_test.go` taught about the new `/panel/api/naive/*` and
+  `/panel/naive` routes — `endpoints.js` documents all 13 of them.
+
 #### Docker image with bundled Caddy
 
 - New `caddy-builder` stage in the Dockerfile uses xcaddy with

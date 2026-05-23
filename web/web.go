@@ -113,6 +113,7 @@ type Server struct {
 	settingService   service.SettingService
 	tgbotService     service.Tgbot
 	customGeoService *service.CustomGeoService
+	naiveService     *service.NaiveService
 
 	wsHub *websocket.Hub
 
@@ -232,7 +233,7 @@ func (s *Server) initRouter() (*gin.Engine, error) {
 
 	s.index = controller.NewIndexController(g)
 	s.panel = controller.NewXUIController(g)
-	s.api = controller.NewAPIController(g, s.customGeoService)
+	s.api = controller.NewAPIController(g, s.customGeoService, s.naiveService)
 
 	// Initialize WebSocket hub
 	s.wsHub = websocket.NewHub()
@@ -385,6 +386,7 @@ func (s *Server) start(restartXray bool, startTgBot bool) (err error) {
 	}))
 
 	s.customGeoService = service.NewCustomGeoService()
+	s.naiveService = service.NewNaiveService()
 
 	engine, err := s.initRouter()
 	if err != nil {
@@ -445,7 +447,7 @@ func (s *Server) start(restartXray bool, startTgBot bool) (err error) {
 	s.startTask(restartXray)
 
 	// bring up any naive servers marked Enable=true
-	go service.GetNaiveService().Restore()
+	go s.naiveService.Restore()
 
 	if startTgBot {
 		isTgbotenabled, err := s.settingService.GetTgbotEnabled()

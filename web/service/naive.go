@@ -54,9 +54,12 @@ type NaiveService struct {
 	procs map[int]*naiveProc
 }
 
-var naiveSvc = &NaiveService{procs: make(map[int]*naiveProc)}
-
-func GetNaiveService() *NaiveService { return naiveSvc }
+// NewNaiveService constructs a fresh NaiveService. The web layer wires one
+// instance into the controller and the boot-time Restore call so the rest
+// of the code doesn't reach for a process-wide singleton.
+func NewNaiveService() *NaiveService {
+	return &NaiveService{procs: make(map[int]*naiveProc)}
+}
 
 func (s *NaiveService) List() ([]*model.NaiveServer, error) {
 	var rows []*model.NaiveServer
@@ -241,8 +244,16 @@ func (s *NaiveService) Start(id int) error {
 	s.procs[id] = &naiveProc{cmd: cmd, started: time.Now(), logPath: logPath, port: srv.Port}
 	logger.Infof("naive: server %d started, pid=%d", id, cmd.Process.Pid)
 
-	// reap so dead procs disappear from status
+	// reap so dead procs disappear from status. recover() guards against
+	// a panic inside this goroutine (e.g. weird logger/mutex state on
+	// shutdown) — the panel must not crash because one naive instance died
+	// in an unexpected way.
 	go func(id int, c *exec.Cmd, lf *os.File) {
+		defer func() {
+			if r := recover(); r != nil {
+				logger.Warningf("naive reaper %d: panic %v", id, r)
+			}
+		}()
 		_ = c.Wait()
 		_ = lf.Close()
 		s.mu.Lock()
