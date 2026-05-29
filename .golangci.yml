@@ -1,0 +1,43 @@
+# golangci-lint configuration (schema v2).
+# Runs the standard analyzers (including `go vet` via the govet linter) plus a
+# few low-noise extras, and enforces gofmt formatting. Kept conservative so it
+# can be adopted on the existing codebase without a large up-front cleanup.
+version: "2"
+
+run:
+  timeout: 5m
+
+linters:
+  # Curated set. `errcheck` is intentionally left out for now: the existing
+  # codebase has ~40 unchecked error returns whose cleanup is a separate effort.
+  # Enable it once those are addressed in a dedicated PR.
+  default: none
+  enable:
+    - govet # includes the analyzers run by `go vet`
+    - ineffassign
+    - staticcheck
+    - unused
+    - bodyclose
+    - misspell
+    - unconvert
+    - whitespace
+  exclusions:
+    generated: lax
+    presets:
+      - comments
+      - common-false-positives
+      - legacy
+      - std-error-handling
+    paths:
+      - frontend/node_modules
+    rules:
+      - path: _test\.go
+        linters:
+          - bodyclose
+
+formatters:
+  enable:
+    - gofmt
+  exclusions:
+    paths:
+      - frontend/node_modules

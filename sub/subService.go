@@ -790,7 +790,7 @@ func buildVmessLink(obj map[string]any) string {
 func cloneVmessShareObj(baseObj map[string]any, newSecurity string) map[string]any {
 	newObj := map[string]any{}
 	for key, value := range baseObj {
-		if !(newSecurity == "none" && (key == "alpn" || key == "sni" || key == "fp")) {
+		if newSecurity != "none" || (key != "alpn" && key != "sni" && key != "fp") {
 			newObj[key] = value
 		}
 	}

@@ -26,11 +26,11 @@ const (
 var warpHTTPClient = &http.Client{Timeout: 15 * time.Second}
 
 func (s *WarpService) GetWarpData() (string, error) {
-	return s.SettingService.GetWarp()
+	return s.GetWarp()
 }
 
 func (s *WarpService) DelWarpData() error {
-	return s.SettingService.SetWarp("")
+	return s.SetWarp("")
 }
 
 func (s *WarpService) GetWarpConfig() (string, error) {
@@ -110,7 +110,7 @@ func (s *WarpService) RegWarp(secretKey string, publicKey string) (string, error
 	if err != nil {
 		return "", err
 	}
-	if err := s.SettingService.SetWarp(string(warpJSON)); err != nil {
+	if err := s.SetWarp(string(warpJSON)); err != nil {
 		return "", err
 	}
 
@@ -161,7 +161,7 @@ func (s *WarpService) SetWarpLicense(license string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	if err := s.SettingService.SetWarp(string(newWarpData)); err != nil {
+	if err := s.SetWarp(string(newWarpData)); err != nil {
 		return "", err
 	}
 	return string(newWarpData), nil
@@ -169,7 +169,7 @@ func (s *WarpService) SetWarpLicense(license string) (string, error) {
 
 // loadWarpCreds reads the stored warp JSON and ensures access_token + device_id are set.
 func (s *WarpService) loadWarpCreds() (map[string]string, error) {
-	warp, err := s.SettingService.GetWarp()
+	warp, err := s.GetWarp()
 	if err != nil {
 		return nil, err
 	}

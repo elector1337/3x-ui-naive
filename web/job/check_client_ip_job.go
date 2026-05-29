@@ -144,7 +144,6 @@ func (j *CheckClientIpJob) hasLimitIp() bool {
 }
 
 func (j *CheckClientIpJob) processLogFile() bool {
-
 	ipRegex := regexp.MustCompile(`from (?:tcp:|udp:)?\[?([0-9a-fA-F\.:]+)\]?:\d+ accepted`)
 	emailRegex := regexp.MustCompile(`email: (.+)$`)
 	timestampRegex := regexp.MustCompile(`^(\d{4}/\d{2}/\d{2} \d{2}:\d{2}:\d{2})`)
@@ -205,7 +204,6 @@ func (j *CheckClientIpJob) processLogFile() bool {
 
 	shouldCleanLog := false
 	for email, ipTimestamps := range inboundClientIps {
-
 		// Convert to IPWithTimestamp slice
 		ipsWithTime := make([]IPWithTimestamp, 0, len(ipTimestamps))
 		for ip, timestamp := range ipTimestamps {

@@ -59,7 +59,6 @@ func (a *InboundController) broadcastInboundsUpdate(userId int) {
 
 // initRouter initializes the routes for inbound-related operations.
 func (a *InboundController) initRouter(g *gin.RouterGroup) {
-
 	g.GET("/list", a.getInbounds)
 	g.GET("/get/:id", a.getInbound)
 	g.GET("/getClientTraffics/:email", a.getClientTraffics)

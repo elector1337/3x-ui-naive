@@ -64,7 +64,6 @@ func (s *OutboundService) addOutboundTraffic(tx *gorm.DB, traffics []*xray.Traff
 
 	for _, traffic := range traffics {
 		if traffic.IsOutbound {
-
 			var outbound model.OutboundTraffics
 
 			err = tx.Model(&model.OutboundTraffics{}).Where("tag = ?", traffic.Tag).

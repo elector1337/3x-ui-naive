@@ -233,7 +233,7 @@ func (t *Tgbot) Start(i18nFS embed.FS) error {
 				logger.Warning("Failed to parse admin ID from Telegram bot chat ID:", err)
 				return err
 			}
-			parsedAdminIds = append(parsedAdminIds, int64(id))
+			parsedAdminIds = append(parsedAdminIds, id)
 		}
 	}
 	tgBotMutex.Lock()
@@ -622,7 +622,6 @@ func (t *Tgbot) OnReceive() {
 					message_text, _ := t.BuildInboundClientDataMessage(inbound.Remark, inbound.Protocol)
 					t.addClient(message.Chat.ID, message_text)
 				}
-
 			} else {
 				if message.UsersShared != nil {
 					if checkAdmin(message.From.ID) {
@@ -686,7 +685,7 @@ func (t *Tgbot) answerCommand(message *telego.Message, chatId int64, isAdmin boo
 			if isAdmin {
 				t.searchClient(chatId, commandArgs[0])
 			} else {
-				t.getClientUsage(chatId, int64(message.From.ID), commandArgs[0])
+				t.getClientUsage(chatId, message.From.ID, commandArgs[0])
 			}
 		} else {
 			msg += t.I18nBot("tgbot.commands.usage")
@@ -1099,14 +1098,13 @@ func (t *Tgbot) answerCallback(callbackQuery *telego.CallbackQuery, isAdmin bool
 
 							if traffic.ExpiryTime > 0 {
 								if traffic.ExpiryTime-time.Now().Unix()*1000 < 0 {
-									date = -int64(days * 24 * 60 * 60000)
+									date = -(days * 24 * 60 * 60000)
 								} else {
-									date = traffic.ExpiryTime + int64(days*24*60*60000)
+									date = traffic.ExpiryTime + days*24*60*60000
 								}
 							} else {
-								date = traffic.ExpiryTime - int64(days*24*60*60000)
+								date = traffic.ExpiryTime - days*24*60*60000
 							}
-
 						}
 						needRestart, err := t.inboundService.ResetClientExpiryTimeByEmail(email, date)
 						if needRestart {
@@ -1189,12 +1187,12 @@ func (t *Tgbot) answerCallback(callbackQuery *telego.CallbackQuery, isAdmin bool
 				var date int64
 				if client_ExpiryTime > 0 {
 					if client_ExpiryTime-time.Now().Unix()*1000 < 0 {
-						date = -int64(days * 24 * 60 * 60000)
+						date = -(days * 24 * 60 * 60000)
 					} else {
-						date = client_ExpiryTime + int64(days*24*60*60000)
+						date = client_ExpiryTime + days*24*60*60000
 					}
 				} else {
-					date = client_ExpiryTime - int64(days*24*60*60000)
+					date = client_ExpiryTime - days*24*60*60000
 				}
 				client_ExpiryTime = date
 
@@ -1619,7 +1617,6 @@ func (t *Tgbot) answerCallback(callbackQuery *telego.CallbackQuery, isAdmin bool
 				if err != nil {
 					t.sendCallbackAnswerTgBot(callbackQuery.ID, err.Error())
 					return
-
 				}
 				t.sendCallbackAnswerTgBot(callbackQuery.ID, t.I18nBot("tgbot.buttons.allClients"))
 				t.SendMsgToTgbot(chatId, t.I18nBot("tgbot.answers.chooseInbound"), inbounds)
@@ -1645,7 +1642,6 @@ func (t *Tgbot) answerCallback(callbackQuery *telego.CallbackQuery, isAdmin bool
 				}
 				t.SendMsgToTgbot(chatId, t.I18nBot("tgbot.answers.chooseInbound"), inbounds)
 			}
-
 		}
 	}
 
@@ -2059,7 +2055,6 @@ func (t *Tgbot) answerCallback(callbackQuery *telego.CallbackQuery, isAdmin bool
 		for _, extra_emails := range extra_emails {
 			msg := fmt.Sprintf("📧 %s\n%s", extra_emails, t.I18nBot("tgbot.noResult"))
 			t.SendMsgToTgbot(chatId, msg, tu.ReplyKeyboardRemove())
-
 		}
 	default:
 		if after, ok := strings.CutPrefix(callbackQuery.Data, "client_sub_links "); ok {
@@ -2211,7 +2206,6 @@ func (t *Tgbot) BuildJSONForProtocol(protocol model.Protocol) (string, error) {
 
 // SubmitAddClient submits the client addition request to the inbound service.
 func (t *Tgbot) SubmitAddClient() (bool, error) {
-
 	inbound, err := t.inboundService.GetInbound(receiver_inbound_ID)
 	if err != nil {
 		logger.Warning("getIboundClients run failed:", err)
@@ -2456,7 +2450,6 @@ func (t *Tgbot) buildSubscriptionURLs(email string) (string, string, error) {
 		}
 		subJsonURL = fmt.Sprintf("%s%s", subJsonURI, client.SubID)
 	} else {
-
 		subJsonURL = fmt.Sprintf("%s://%s%s%s", scheme, host, subJsonPath, client.SubID)
 	}
 
@@ -2706,7 +2699,7 @@ func (t *Tgbot) SendBackupToAdmins() {
 		return
 	}
 	for i, adminId := range adminIds {
-		t.sendBackup(int64(adminId))
+		t.sendBackup(adminId)
 		// Add delay between sends to avoid Telegram rate limits
 		if i < len(adminIds)-1 {
 			time.Sleep(1 * time.Second)
@@ -2720,7 +2713,7 @@ func (t *Tgbot) sendExhaustedToAdmins() {
 		return
 	}
 	for _, adminId := range adminIds {
-		t.getExhausted(int64(adminId))
+		t.getExhausted(adminId)
 	}
 }
 
@@ -2953,11 +2946,9 @@ func (t *Tgbot) getInboundClientsFor(inboundID int, action string) (*telego.Inli
 			for _, client := range clients {
 				buttons = append(buttons, tu.InlineKeyboardButton(client.Email).WithCallbackData(t.encodeQuery(action+" "+client.Email)))
 			}
-
 		} else {
 			return nil, errors.New(t.I18nBot("tgbot.answers.getClientsFailed"))
 		}
-
 	}
 	cols := 0
 	if len(buttons) < 6 {
@@ -3031,11 +3022,9 @@ func (t *Tgbot) getInboundClients(id int) (*telego.InlineKeyboardMarkup, error) 
 			for _, client := range clients {
 				buttons = append(buttons, tu.InlineKeyboardButton(client.Email).WithCallbackData(t.encodeQuery("client_get_usage "+client.Email)))
 			}
-
 		} else {
 			return nil, errors.New(t.I18nBot("tgbot.answers.getClientsFailed"))
 		}
-
 	}
 	cols := 0
 	if len(buttons) < 6 {
@@ -3460,7 +3449,6 @@ func (t *Tgbot) addClient(chatId int64, msg string, messageID ...int) {
 	} else {
 		t.SendMsgToTgbot(chatId, msg, inlineKeyboard)
 	}
-
 }
 
 // searchInbound searches for inbounds by remark and sends the results.

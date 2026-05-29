@@ -88,7 +88,7 @@ func (s *NordService) SetKey(privateKey string) (string, error) {
 		"token":       "",
 	}
 	data, _ := json.Marshal(nordData)
-	err := s.SettingService.SetNord(string(data))
+	err := s.SetNord(string(data))
 	if err != nil {
 		return "", err
 	}
@@ -133,7 +133,7 @@ func (s *NordService) GetCredentials(token string) (string, error) {
 		"token":       token,
 	}
 	data, _ := json.Marshal(nordData)
-	err = s.SettingService.SetNord(string(data))
+	err = s.SetNord(string(data))
 	if err != nil {
 		return "", err
 	}
@@ -142,9 +142,9 @@ func (s *NordService) GetCredentials(token string) (string, error) {
 }
 
 func (s *NordService) GetNordData() (string, error) {
-	return s.SettingService.GetNord()
+	return s.GetNord()
 }
 
 func (s *NordService) DelNordData() error {
-	return s.SettingService.SetNord("")
+	return s.SetNord("")
 }

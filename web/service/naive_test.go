@@ -125,7 +125,7 @@ func TestValidateNaive_AuthCharsetRejection(t *testing.T) {
 		}
 	}
 	cases := []struct {
-		name  string
+		name   string
 		mutate func(*model.NaiveServer)
 		wantOK bool
 	}{

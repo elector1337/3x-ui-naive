@@ -33,7 +33,7 @@ func CheckPasswordHash(hash, password string) bool {
 const encPrefix = "enc:v1:"
 
 var (
-	keyMu    sync.RWMutex
+	keyMu     sync.RWMutex
 	cachedKey []byte
 	keyPathFn = defaultKeyPath
 )

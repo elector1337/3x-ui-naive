@@ -17,7 +17,6 @@ type APIController struct {
 	inboundController *InboundController
 	serverController  *ServerController
 	nodeController    *NodeController
-	settingService    service.SettingService
 	userService       service.UserService
 	apiTokenService   service.ApiTokenService
 	Tgbot             service.Tgbot

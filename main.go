@@ -379,7 +379,6 @@ func GetCertificate(getCert bool) {
 // GetListenIP displays the current panel listen IP address if getListen is true.
 func GetListenIP(getListen bool) {
 	if getListen {
-
 		settingService := service.SettingService{}
 		ListenIP, err := settingService.GetListen()
 		if err != nil {

@@ -38,6 +38,38 @@ permissions:
   contents: read
 
 jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-go@v6
+        with:
+          go-version-file: go.mod
+          cache: true
+      - name: Stub web/dist for go:embed
+        run: mkdir -p web/dist && touch web/dist/.gitkeep
+      - name: gofmt
+        run: |
+          unformatted=$(gofmt -l $(git ls-files '*.go'))
+          if [ -n "$unformatted" ]; then
+            echo "::error::The following files are not gofmt-formatted:"
+            echo "$unformatted"
+            echo "Run: gofmt -w ."
+            exit 1
+          fi
+      - name: go vet
+        run: |
+          go list ./... | grep -v '/frontend/node_modules/' > /tmp/go-packages.txt
+          go vet $(cat /tmp/go-packages.txt)
+      # NOTE: install via `go install` (not golangci-lint-action) on purpose.
+      # The action ships prebuilt binaries built with an older Go toolchain,
+      # which refuse to lint a module that targets a newer `go` directive
+      # (see go.mod). Building with the repo's toolchain keeps them in sync.
+      - name: Install golangci-lint
+        run: go install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@v2.6.2
+      - name: golangci-lint
+        run: golangci-lint run ./...
+
   go-test:
     runs-on: ubuntu-latest
     steps:

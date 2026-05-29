@@ -78,7 +78,7 @@ func GetAccessLogPath() (string, error) {
 	}
 
 	jsonConfig := map[string]any{}
-	err = json.Unmarshal([]byte(config), &jsonConfig)
+	err = json.Unmarshal(config, &jsonConfig)
 	if err != nil {
 		logger.Warningf("Failed to parse JSON configuration: %s", err)
 		return "", err

@@ -289,7 +289,7 @@ func (s *InboundService) normalizeStreamSettings(inbound *model.Inbound) {
 		model.Hysteria:    true,
 		model.Hysteria2:   true,
 	}
-	
+
 	if !protocolsWithStream[inbound.Protocol] {
 		inbound.StreamSettings = ""
 	}
@@ -302,7 +302,7 @@ func (s *InboundService) normalizeStreamSettings(inbound *model.Inbound) {
 func (s *InboundService) AddInbound(inbound *model.Inbound) (*model.Inbound, bool, error) {
 	// Normalize streamSettings based on protocol
 	s.normalizeStreamSettings(inbound)
-	
+
 	exist, err := s.checkPortConflict(inbound, 0)
 	if err != nil {
 		return inbound, false, err
@@ -558,7 +558,7 @@ func (s *InboundService) SetInboundEnable(id int, enable bool) (bool, error) {
 func (s *InboundService) UpdateInbound(inbound *model.Inbound) (*model.Inbound, bool, error) {
 	// Normalize streamSettings based on protocol
 	s.normalizeStreamSettings(inbound)
-	
+
 	exist, err := s.checkPortConflict(inbound, inbound.Id)
 	if err != nil {
 		return inbound, false, err
@@ -3621,7 +3621,7 @@ func (s *InboundService) MigrationRequirements() {
 
 				// Convert string tgId to int64
 				if _, ok := c["tgId"]; ok {
-					var tgId any = c["tgId"]
+					var tgId = c["tgId"]
 					if tgIdStr, ok2 := tgId.(string); ok2 {
 						tgIdInt64, err := strconv.ParseInt(strings.ReplaceAll(tgIdStr, " ", ""), 10, 64)
 						if err == nil {

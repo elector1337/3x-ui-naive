@@ -55,6 +55,7 @@ func (c *CaddyInstaller) Install(ctx context.Context, out chan<- string) error {
 	defer close(out)
 
 	if !goAvailable() {
+		//nolint:staticcheck // ST1005: "Go" is a proper noun and must stay capitalized
 		return errors.New("Go toolchain not found in PATH — install Go 1.22+ first (https://go.dev/dl/)")
 	}
 
