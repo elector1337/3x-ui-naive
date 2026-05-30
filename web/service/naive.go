@@ -494,9 +494,11 @@ func renderNaiveCaddyfile(srv *model.NaiveServer) string {
 	b.WriteString("\t\t\thide_ip\n")
 	b.WriteString("\t\t\thide_via\n")
 	b.WriteString("\t\t\tprobe_resistance\n")
-	if srv.Padding {
-		b.WriteString("\t\t\tpadding\n")
-	}
+	// NOTE: no explicit `padding` directive. The klzgrad/forwardproxy fork
+	// pads HTTP/2 traffic by default and rejects a bare `padding` token
+	// (`caddy adapt` fails: "wrong argument count ... after 'padding'"),
+	// which would stop the server from starting. srv.Padding is kept for
+	// API/DB back-compat but no longer emitted.
 	b.WriteString("\t\t}\n")
 	b.WriteString("\t}\n")
 	b.WriteString("}\n")

@@ -44,7 +44,6 @@ func TestWriteNaiveConfig_BasicCaddyfile(t *testing.T) {
 		"hide_ip",
 		"hide_via",
 		"probe_resistance",
-		"padding",
 	} {
 		if !strings.Contains(out, want) {
 			t.Errorf("caddyfile missing %q\n--full--\n%s", want, out)
@@ -53,6 +52,11 @@ func TestWriteNaiveConfig_BasicCaddyfile(t *testing.T) {
 	// 0.0.0.0 should be normalized to bind-all (no explicit bind directive)
 	if strings.Contains(out, "bind ") {
 		t.Errorf("0.0.0.0 should not produce a bind directive\n%s", out)
+	}
+	// The klzgrad fork pads by default and rejects a bare `padding` directive,
+	// so it must never be emitted — even with Padding:true (as set above).
+	if strings.Contains(out, "padding") {
+		t.Errorf("padding directive must not be emitted (breaks caddy adapt)\n%s", out)
 	}
 }
 
