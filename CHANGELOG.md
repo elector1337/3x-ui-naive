@@ -8,7 +8,7 @@ Versions are tagged against the upstream commit the fork is based on.
 
 ---
 
-## [Unreleased] — feature/naive-proxy
+## [0.2.0] — 2026-06-01
 
 Based on upstream commit [`f9ae0347`](https://github.com/MHSanaei/3x-ui/commit/f9ae0347).
 
