@@ -11,6 +11,7 @@ import {
   FileTextOutlined,
   DeleteOutlined,
   CopyOutlined,
+  QrcodeOutlined,
   CloudServerOutlined,
   CheckCircleOutlined,
   CloseCircleOutlined,
@@ -22,6 +23,7 @@ import { ClipboardManager, SizeFormatter } from '@/utils';
 import AppSidebar from '@/components/AppSidebar.vue';
 import CustomStatistic from '@/components/CustomStatistic.vue';
 import NaiveFormModal from './NaiveFormModal.vue';
+import QrPanel from '../inbounds/QrPanel.vue';
 import { useNaive } from './useNaive.js';
 
 const { t } = useI18n();
@@ -154,6 +156,14 @@ function clientUrl(s) {
 async function onCopy(s) {
   await ClipboardManager.write(clientUrl(s));
   message.success(t('copied'));
+}
+
+const qrOpen = ref(false);
+const qrTarget = ref(null);
+
+function onShowQr(s) {
+  qrTarget.value = s;
+  qrOpen.value = true;
 }
 
 function isRunning(id) {
@@ -310,6 +320,9 @@ const columns = computed(() => [
                         <a-button size="small" @click="onCopy(srv)">
                           <template #icon><CopyOutlined /></template>
                         </a-button>
+                        <a-button size="small" @click="onShowQr(srv)">
+                          <template #icon><QrcodeOutlined /></template>
+                        </a-button>
                         <a-button
                           v-if="!isRunning(srv.id)"
                           size="small"
@@ -396,6 +409,11 @@ const columns = computed(() => [
                               <template #icon><CopyOutlined /></template>
                             </a-button>
                           </a-tooltip>
+                          <a-tooltip :title="t('pages.naive.showQr')">
+                            <a-button size="small" @click="onShowQr(record)">
+                              <template #icon><QrcodeOutlined /></template>
+                            </a-button>
+                          </a-tooltip>
                           <a-button
                             v-if="!isRunning(record.id)"
                             size="small"
@@ -466,6 +484,19 @@ const columns = computed(() => [
           <span class="log-hint">{{ t('pages.naive.logHint') }}</span>
         </a-space>
         <pre class="log-view">{{ logText || t('pages.naive.logEmpty') }}</pre>
+      </a-modal>
+
+      <a-modal
+        v-model:open="qrOpen"
+        :title="t('pages.naive.qrTitle', { name: qrTarget?.remark || `naive-${qrTarget?.id}` })"
+        width="420px"
+        :footer="null"
+      >
+        <QrPanel
+          v-if="qrTarget"
+          :value="clientUrl(qrTarget)"
+          :remark="qrTarget.remark || qrTarget.domain"
+        />
       </a-modal>
     </a-layout>
   </a-config-provider>

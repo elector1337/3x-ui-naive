@@ -418,6 +418,8 @@
       "resetTraffic": "Reset traffic",
       "totals": { "total": "Total", "running": "Running", "stopped": "Stopped" },
       "copyUrl": "Copy client URL",
+      "showQr": "Show QR code",
+      "qrTitle": "QR code — {name}",
       "viewLog": "Show log",
       "logTitle": "Log — {name}",
       "logEmpty": "Log is empty (server hasn't started or hasn't printed anything yet).",
