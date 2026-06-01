@@ -645,6 +645,12 @@ export const sections = [
         params: [{ name: 'id', in: 'path', type: 'number', desc: 'Server ID.' }],
       },
       {
+        method: 'POST',
+        path: '/panel/api/naive/reset-traffic/:id',
+        summary: 'Reset the stored up/down byte counters for a naive server to zero.',
+        params: [{ name: 'id', in: 'path', type: 'number', desc: 'Server ID.' }],
+      },
+      {
         method: 'GET',
         path: '/panel/api/naive/caddy-status',
         summary: 'Where the panel found a usable Caddy binary, its version, and whether Go is available for building.',

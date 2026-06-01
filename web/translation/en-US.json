@@ -413,6 +413,9 @@
       "stop": "Stop",
       "restart": "Restart",
       "statusCol": "Status",
+      "trafficCol": "Traffic",
+      "trafficHint": "Upload / download bytes counted by the kernel (Linux + root). Zero on other platforms.",
+      "resetTraffic": "Reset traffic",
       "totals": { "total": "Total", "running": "Running", "stopped": "Stopped" },
       "copyUrl": "Copy client URL",
       "viewLog": "Show log",
@@ -456,6 +459,7 @@
         "started": "Started",
         "stopped": "Stopped",
         "restarted": "Restarted",
+        "trafficReset": "Traffic reset",
         "caddyInstalled": "Caddy installed",
         "caddyInstallFailed": "Caddy install failed"
       },

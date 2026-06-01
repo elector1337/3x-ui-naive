@@ -18,7 +18,7 @@ import {
 
 import { theme as themeState, antdThemeConfig } from '@/composables/useTheme.js';
 import { useMediaQuery } from '@/composables/useMediaQuery.js';
-import { ClipboardManager } from '@/utils';
+import { ClipboardManager, SizeFormatter } from '@/utils';
 import AppSidebar from '@/components/AppSidebar.vue';
 import CustomStatistic from '@/components/CustomStatistic.vue';
 import NaiveFormModal from './NaiveFormModal.vue';
@@ -41,6 +41,7 @@ const {
   start,
   stop,
   restart,
+  resetTraffic,
 } = useNaive();
 
 const installing = ref(false);
@@ -139,6 +140,11 @@ async function onRestart(s) {
   if (msg?.success) message.success(t('pages.naive.toasts.restarted'));
 }
 
+async function onResetTraffic(s) {
+  const msg = await resetTraffic(s.id);
+  if (msg?.success) message.success(t('pages.naive.toasts.trafficReset'));
+}
+
 function clientUrl(s) {
   const user = encodeURIComponent(s.authUser);
   const pass = encodeURIComponent(s.authPass);
@@ -170,7 +176,8 @@ const columns = computed(() => [
   { key: 'domain', title: t('pages.naive.fields.domain') },
   { key: 'enable', title: t('pages.naive.fields.enable'), width: 110 },
   { key: 'status', title: t('pages.naive.statusCol'), width: 120 },
-  { key: 'actions', title: '', width: 300, align: 'right' },
+  { key: 'traffic', title: t('pages.naive.trafficCol'), width: 150 },
+  { key: 'actions', title: '', width: 340, align: 'right' },
 ]);
 </script>
 
@@ -376,6 +383,12 @@ const columns = computed(() => [
                         <a-tag v-else color="default">{{ t('pages.naive.stopped') }}</a-tag>
                       </template>
 
+                      <template v-else-if="column.key === 'traffic'">
+                        <a-tooltip :title="t('pages.naive.trafficHint')">
+                          <span>↑ {{ SizeFormatter.sizeFormat(record.up || 0) }} / ↓ {{ SizeFormatter.sizeFormat(record.down || 0) }}</span>
+                        </a-tooltip>
+                      </template>
+
                       <template v-else-if="column.key === 'actions'">
                         <a-space :size="4" wrap>
                           <a-tooltip :title="t('pages.naive.copyUrl')">
@@ -409,6 +422,11 @@ const columns = computed(() => [
                           <a-button size="small" @click="onEdit(record)">
                             <template #icon><EditOutlined /></template>
                           </a-button>
+                          <a-tooltip :title="t('pages.naive.resetTraffic')">
+                            <a-button size="small" @click="onResetTraffic(record)">
+                              <template #icon><ReloadOutlined /></template>
+                            </a-button>
+                          </a-tooltip>
                           <a-button size="small" danger @click="onDelete(record)">
                             <template #icon><DeleteOutlined /></template>
                           </a-button>

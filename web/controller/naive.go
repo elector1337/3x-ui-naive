@@ -41,6 +41,7 @@ func (a *NaiveController) initRouter(g *gin.RouterGroup) {
 	g.POST("/start/:id", a.start)
 	g.POST("/stop/:id", a.stop)
 	g.POST("/restart/:id", a.restart)
+	g.POST("/reset-traffic/:id", a.resetTraffic)
 	g.GET("/caddy-status", a.caddyStatus)
 	g.POST("/install-caddy", a.installCaddy)
 	g.POST("/preview", a.preview)
@@ -176,6 +177,18 @@ func (a *NaiveController) stop(c *gin.Context) {
 		return
 	}
 	jsonMsg(c, "stopped", nil)
+}
+
+func (a *NaiveController) resetTraffic(c *gin.Context) {
+	id, ok := parseID(c)
+	if !ok {
+		return
+	}
+	if err := a.svc.ResetTraffic(id); err != nil {
+		jsonMsg(c, "", err)
+		return
+	}
+	jsonMsg(c, "traffic reset", nil)
 }
 
 // preview renders the Caddyfile the panel would write for the given form values.

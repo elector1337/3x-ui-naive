@@ -8,6 +8,31 @@ Versions are tagged against the upstream commit the fork is based on.
 
 ---
 
+## [Unreleased] — feature/naive-proxy
+
+### Added
+
+#### Naive traffic stats
+
+- Per-server upload / download byte counters, shown in a new **Traffic**
+  column on `/panel/naive` (`↑ up / ↓ down`, human-readable sizes) and
+  reset via a per-row button.
+- Counts come from the **kernel** (nftables): Caddy's `forward_proxy` does
+  not report tunnel bytes (verified — a CONNECT request logs `size:0`,
+  `bytes_read:0`), so the panel installs one input + one output counter per
+  naive port in an `inet 3xui_naive` table and reads them with
+  `nft -j reset counters` (atomic read-and-zero).
+- New `up` / `down` columns on `naive_servers` (gorm auto-migrated),
+  cumulative across restarts until reset.
+- `NaiveTrafficJob` samples every 30 s into the DB. Counter table is rebuilt
+  on every add/update/delete and on boot; torn down when no servers remain.
+- New endpoint `POST /panel/api/naive/reset-traffic/:id`.
+- **Linux + root only.** On any other OS, without root, or without the `nft`
+  binary, the whole feature is a graceful no-op and traffic stays at 0 —
+  removing the "traffic stats not collected" known limitation there.
+
+---
+
 ## [0.2.0] — 2026-06-01
 
 Based on upstream commit [`f9ae0347`](https://github.com/MHSanaei/3x-ui/commit/f9ae0347).

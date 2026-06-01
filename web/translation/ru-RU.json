@@ -413,6 +413,9 @@
       "stop": "Остановить",
       "restart": "Перезапустить",
       "statusCol": "Состояние",
+      "trafficCol": "Трафик",
+      "trafficHint": "Отправлено / получено байт по счётчику ядра (Linux + root). На других платформах — ноль.",
+      "resetTraffic": "Сбросить трафик",
       "totals": { "total": "Всего", "running": "Запущены", "stopped": "Остановлены" },
       "copyUrl": "Скопировать клиентский URL",
       "viewLog": "Показать лог",
@@ -456,6 +459,7 @@
         "started": "Запущено",
         "stopped": "Остановлено",
         "restarted": "Перезапущено",
+        "trafficReset": "Трафик сброшен",
         "caddyInstalled": "Caddy установлен",
         "caddyInstallFailed": "Не удалось установить Caddy"
       },

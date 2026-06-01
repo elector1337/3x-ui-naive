@@ -82,6 +82,12 @@ export function useNaive() {
     return msg;
   }
 
+  async function resetTraffic(id) {
+    const msg = await HttpUtil.post(`/panel/api/naive/reset-traffic/${id}`);
+    if (msg?.success) await refresh();
+    return msg;
+  }
+
   // installCaddy posts to the SSE endpoint and resolves after the build finishes.
   // Returns { ok, log } — the full xcaddy output for display.
   async function fetchLog(id, tail = 200) {
@@ -144,5 +150,6 @@ export function useNaive() {
     start,
     stop,
     restart,
+    resetTraffic,
   };
 }

@@ -102,6 +102,7 @@ func (s *NaiveService) Add(srv *model.NaiveServer) error {
 		return err
 	}
 	roundTripAuthPass(srv, plain)
+	s.syncTrafficCounters()
 	return nil
 }
 
@@ -119,12 +120,85 @@ func (s *NaiveService) Update(srv *model.NaiveServer) error {
 		return err
 	}
 	roundTripAuthPass(srv, plain)
+	s.syncTrafficCounters()
 	return nil
 }
 
 func (s *NaiveService) Delete(id int) error {
 	_ = s.Stop(id)
-	return database.GetDB().Delete(&model.NaiveServer{}, id).Error
+	err := database.GetDB().Delete(&model.NaiveServer{}, id).Error
+	s.syncTrafficCounters()
+	return err
+}
+
+// syncTrafficCounters rebuilds the kernel (nftables) counter table from the
+// current set of servers. Called after any structural change (add/update/delete)
+// and on boot. Best-effort: on non-Linux, without root, or without nft it is a
+// no-op, and any error is logged rather than propagated — traffic accounting is
+// auxiliary and must never block server management.
+func (s *NaiveService) syncTrafficCounters() {
+	rows, err := s.List()
+	if err != nil {
+		logger.Warningf("naive traffic: list for counter sync: %v", err)
+		return
+	}
+	if len(rows) == 0 {
+		// No servers left — remove the table entirely rather than leaving an
+		// empty one behind.
+		if err := teardownNftCounters(); err != nil {
+			logger.Warningf("naive traffic: teardown counters: %v", err)
+		}
+		return
+	}
+	if err := rebuildNftCounters(rows); err != nil {
+		logger.Warningf("naive traffic: rebuild counters: %v", err)
+	}
+}
+
+// SampleTraffic reads-and-zeroes the kernel counters and accumulates the deltas
+// into each server's Up/Down columns. Called periodically by the naive traffic
+// cron job. No-op when nft is unavailable.
+func (s *NaiveService) SampleTraffic() error {
+	deltas, err := sampleNftCounters()
+	if err != nil {
+		return err
+	}
+	return s.applyTrafficDeltas(deltas)
+}
+
+// applyTrafficDeltas accumulates the given per-server byte deltas into the
+// stored Up/Down columns. Split out from SampleTraffic so it can be tested
+// without nft. No-op for an empty map.
+func (s *NaiveService) applyTrafficDeltas(deltas map[int]naiveTrafficDelta) error {
+	if len(deltas) == 0 {
+		return nil
+	}
+	return submitTrafficWrite(func() error {
+		db := database.GetDB()
+		for id, d := range deltas {
+			if d.Up == 0 && d.Down == 0 {
+				continue
+			}
+			// UpdateColumns (not Save) so the AuthPass BeforeSave encryption
+			// hook and autoUpdateTime are both skipped — we only touch counters.
+			if err := db.Model(&model.NaiveServer{}).Where("id = ?", id).
+				UpdateColumns(map[string]any{
+					"up":   gorm.Expr("up + ?", d.Up),
+					"down": gorm.Expr("down + ?", d.Down),
+				}).Error; err != nil {
+				return err
+			}
+		}
+		return nil
+	})
+}
+
+// ResetTraffic zeroes the stored Up/Down counters for one server.
+func (s *NaiveService) ResetTraffic(id int) error {
+	return submitTrafficWrite(func() error {
+		return database.GetDB().Model(&model.NaiveServer{}).Where("id = ?", id).
+			UpdateColumns(map[string]any{"up": 0, "down": 0}).Error
+	})
 }
 
 func (s *NaiveService) Status(id int) NaiveStatus {
@@ -366,6 +440,7 @@ func (s *NaiveService) Restore() {
 		}(srv.Id)
 	}
 	wg.Wait()
+	s.syncTrafficCounters()
 }
 
 func validateNaive(srv *model.NaiveServer) error {

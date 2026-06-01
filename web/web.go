@@ -449,6 +449,10 @@ func (s *Server) start(restartXray bool, startTgBot bool) (err error) {
 	// bring up any naive servers marked Enable=true
 	go s.naiveService.Restore()
 
+	// sample naive per-port traffic from kernel nftables counters into the DB
+	// (Linux + root only; a graceful no-op everywhere else)
+	s.cron.AddJob("@every 30s", job.NewNaiveTrafficJob(s.naiveService))
+
 	if startTgBot {
 		isTgbotenabled, err := s.settingService.GetTgbotEnabled()
 		if (err == nil) && (isTgbotenabled) {

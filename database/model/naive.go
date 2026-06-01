@@ -25,8 +25,14 @@ type NaiveServer struct {
 	ExtraArgs    string `json:"extraArgs" form:"extraArgs"`
 	UseRawConfig bool   `json:"useRawConfig" form:"useRawConfig" gorm:"default:false"`
 	RawConfig    string `json:"rawConfig" form:"rawConfig"`
-	CreatedAt    int64  `json:"createdAt" gorm:"autoCreateTime"`
-	UpdatedAt    int64  `json:"updatedAt" gorm:"autoUpdateTime"`
+	// Up / Down are cumulative byte counters sampled from the kernel (nftables)
+	// by the naive traffic job. They keep accumulating across restarts until an
+	// explicit reset. Caddy's forward_proxy does not report tunnel bytes itself,
+	// so the count comes from a per-port nftables counter (Linux + root only).
+	Up        int64 `json:"up" form:"up" gorm:"default:0"`
+	Down      int64 `json:"down" form:"down" gorm:"default:0"`
+	CreatedAt int64 `json:"createdAt" gorm:"autoCreateTime"`
+	UpdatedAt int64 `json:"updatedAt" gorm:"autoUpdateTime"`
 }
 
 func (NaiveServer) TableName() string { return "naive_servers" }
