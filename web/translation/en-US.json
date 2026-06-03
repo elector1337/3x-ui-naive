@@ -463,6 +463,8 @@
       "never": "Never",
       "depleted": "Depleted",
       "expired": "Expired",
+      "usersSection": "Additional users",
+      "addUser": "Add user",
       "reset": { "never": "Never", "day": "Daily", "week": "Weekly", "month": "Monthly" },
       "toasts": {
         "deleted": "Deleted",

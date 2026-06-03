@@ -251,6 +251,72 @@ func TestResetTrafficBySchedule_OnlyMatchingPeriod(t *testing.T) {
 	}
 }
 
+// TestNaiveUsers_PersistAndReplace verifies users round-trip in plaintext,
+// survive reload (decrypted), and that Update replaces the set.
+func TestNaiveUsers_PersistAndReplace(t *testing.T) {
+	setupConflictDB(t)
+	crypto.SetEncryptionKeyPath(filepath.Join(t.TempDir(), "encryption.key"))
+	StartTrafficWriter()
+	t.Cleanup(StopTrafficWriter)
+
+	svc := NewNaiveService()
+	srv := &model.NaiveServer{
+		Remark: "m", Port: 8443, Domain: "m.example.com", CertFile: "/x", KeyFile: "/y",
+		AuthUser: "alice", AuthPass: "p1",
+		Users: []*model.NaiveUser{
+			{Username: "bob", Password: "p2", Enable: true},
+			{Username: "carol", Password: "p3", Enable: true},
+		},
+	}
+	if err := svc.Add(srv); err != nil {
+		t.Fatalf("add: %v", err)
+	}
+	// passwords still plaintext in the returned struct
+	for _, u := range srv.Users {
+		if u.Password == "" || len(u.Password) > 20 {
+			t.Errorf("user %s password not plaintext after Add: %q", u.Username, u.Password)
+		}
+	}
+
+	got, err := svc.Get(srv.Id)
+	if err != nil {
+		t.Fatalf("get: %v", err)
+	}
+	if len(got.Users) != 2 {
+		t.Fatalf("expected 2 users after reload, got %d", len(got.Users))
+	}
+	byName := map[string]string{}
+	for _, u := range got.Users {
+		byName[u.Username] = u.Password
+	}
+	if byName["bob"] != "p2" || byName["carol"] != "p3" {
+		t.Errorf("passwords not decrypted on reload: %+v", byName)
+	}
+
+	// Update replaces the user set: drop carol, add dave.
+	got.Users = []*model.NaiveUser{
+		{Username: "bob", Password: "p2new", Enable: true},
+		{Username: "dave", Password: "p4", Enable: true},
+	}
+	if err := svc.Update(got); err != nil {
+		t.Fatalf("update: %v", err)
+	}
+	reloaded, _ := svc.Get(srv.Id)
+	if len(reloaded.Users) != 2 {
+		t.Fatalf("expected 2 users after replace, got %d", len(reloaded.Users))
+	}
+	names := map[string]string{}
+	for _, u := range reloaded.Users {
+		names[u.Username] = u.Password
+	}
+	if _, ok := names["carol"]; ok {
+		t.Error("carol should have been removed by replace")
+	}
+	if names["bob"] != "p2new" || names["dave"] != "p4" {
+		t.Errorf("unexpected users after replace: %+v", names)
+	}
+}
+
 // nftAvailable must be a safe no-op gate on non-Linux dev machines.
 func TestNftUnavailableIsNoOp(t *testing.T) {
 	if nftAvailable() {

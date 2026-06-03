@@ -12,6 +12,21 @@ Versions are tagged against the upstream commit the fork is based on.
 
 ### Added
 
+#### Multiple users per naive server
+
+- New `naive_users` table (gorm auto-migrated) holding extra `basic_auth`
+  credentials beyond the server's primary `authUser`/`authPass`. Passwords
+  are encrypted at rest with the same AES-256-GCM scheme.
+- The Caddyfile generator emits one `basic_auth` line per enabled credential
+  (primary + each enabled extra user). Verified valid against a real
+  `caddy adapt`, and both users authenticate at runtime while a wrong one
+  gets 407.
+- Add/edit form gains an **Additional users** section (username / password /
+  enable, add & remove). Update replaces the user set.
+- Each enabled credential gets its own client URL and its own QR panel in the
+  QR modal. Validation enforces the same charset/length rules per user and
+  rejects duplicate usernames.
+
 #### Naive traffic limits, expiry & auto-stop
 
 - New `total` (quota, bytes), `expiryTime` (absolute ms), `trafficReset`

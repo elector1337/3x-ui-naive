@@ -104,6 +104,42 @@ func TestWriteNaiveConfig_NoPadding(t *testing.T) {
 	}
 }
 
+func TestRenderCaddyfile_MultiUser(t *testing.T) {
+	srv := &model.NaiveServer{
+		Port: 443, Domain: "x.example.com", CertFile: "/a", KeyFile: "/b",
+		AuthUser: "alice", AuthPass: "p1",
+		Users: []*model.NaiveUser{
+			{Username: "bob", Password: "p2", Enable: true},
+			{Username: "carol", Password: "p3", Enable: false}, // disabled -> skipped
+			{Username: "dave", Password: "p4", Enable: true},
+		},
+	}
+	out := RenderCaddyfile(srv)
+	for _, want := range []string{
+		"basic_auth alice p1",
+		"basic_auth bob p2",
+		"basic_auth dave p4",
+	} {
+		if !strings.Contains(out, want) {
+			t.Errorf("missing %q\n%s", want, out)
+		}
+	}
+	if strings.Contains(out, "carol") {
+		t.Errorf("disabled user carol must not appear\n%s", out)
+	}
+}
+
+func TestValidateNaive_RejectsDuplicateUser(t *testing.T) {
+	srv := &model.NaiveServer{
+		Port: 443, Domain: "x.example.com", CertFile: "/a", KeyFile: "/b",
+		AuthUser: "alice", AuthPass: "p1",
+		Users: []*model.NaiveUser{{Username: "alice", Password: "p2", Enable: true}},
+	}
+	if err := validateNaive(srv); err == nil {
+		t.Error("expected duplicate-username error (alice clashes with primary)")
+	}
+}
+
 func TestWriteNaiveConfig_RawMode(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, "out.caddyfile")

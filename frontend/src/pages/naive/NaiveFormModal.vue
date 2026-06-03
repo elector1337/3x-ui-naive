@@ -3,6 +3,7 @@ import { computed, ref, watch } from 'vue';
 import { useI18n } from 'vue-i18n';
 import { message } from 'ant-design-vue';
 import dayjs from 'dayjs';
+import { DeleteOutlined, PlusOutlined } from '@ant-design/icons-vue';
 import { HttpUtil } from '@/utils';
 
 const props = defineProps({
@@ -35,11 +36,21 @@ function blank() {
     total: 0,
     expiryTime: 0,
     trafficReset: 'never',
+    users: [],
   };
 }
 
 const form = ref(blank());
 const saving = ref(false);
+
+function addUser() {
+  if (!Array.isArray(form.value.users)) form.value.users = [];
+  form.value.users.push({ username: '', password: '', enable: true });
+}
+
+function removeUser(idx) {
+  form.value.users.splice(idx, 1);
+}
 
 const GB = 1024 * 1024 * 1024;
 
@@ -292,6 +303,24 @@ async function save() {
           </a-form-item>
         </a-col>
       </a-row>
+
+      <a-divider style="margin: 4px 0 12px">{{ t('pages.naive.usersSection') }}</a-divider>
+      <div class="naive-users">
+        <div v-for="(u, idx) in form.users" :key="idx" class="naive-user-row">
+          <a-input v-model:value="u.username" :placeholder="t('pages.naive.fields.authUser')" style="flex: 1" />
+          <a-input-password v-model:value="u.password" :placeholder="t('pages.naive.fields.authPass')" style="flex: 1" />
+          <a-tooltip :title="t('pages.naive.fields.enable')">
+            <a-switch v-model:checked="u.enable" />
+          </a-tooltip>
+          <a-button danger type="text" @click="removeUser(idx)">
+            <template #icon><DeleteOutlined /></template>
+          </a-button>
+        </div>
+        <a-button type="dashed" block @click="addUser">
+          <template #icon><PlusOutlined /></template>
+          {{ t('pages.naive.addUser') }}
+        </a-button>
+      </div>
       </template>
     </a-form>
   </a-modal>
@@ -302,5 +331,17 @@ async function save() {
   font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
   font-size: 12px;
   tab-size: 4;
+}
+
+.naive-users {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.naive-user-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
 }
 </style>

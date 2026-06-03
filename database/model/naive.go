@@ -41,11 +41,46 @@ type NaiveServer struct {
 	TrafficReset string `json:"trafficReset" form:"trafficReset" gorm:"default:never"`
 	// LastTrafficResetTime records when the periodic reset last ran (ms).
 	LastTrafficResetTime int64 `json:"lastTrafficResetTime" form:"lastTrafficResetTime" gorm:"default:0"`
-	CreatedAt            int64 `json:"createdAt" gorm:"autoCreateTime"`
-	UpdatedAt            int64 `json:"updatedAt" gorm:"autoUpdateTime"`
+	// Users are additional basic_auth credentials beyond AuthUser/AuthPass.
+	// Each enabled user becomes its own `basic_auth` line in the Caddyfile and
+	// gets its own client URL / QR. Loaded via Preload; cascade-deleted.
+	Users     []*NaiveUser `json:"users" form:"users" gorm:"foreignKey:NaiveId;constraint:OnDelete:CASCADE"`
+	CreatedAt int64        `json:"createdAt" gorm:"autoCreateTime"`
+	UpdatedAt int64        `json:"updatedAt" gorm:"autoUpdateTime"`
 }
 
 func (NaiveServer) TableName() string { return "naive_servers" }
+
+// NaiveUser is an extra basic_auth credential attached to a NaiveServer.
+type NaiveUser struct {
+	Id       int    `json:"id" form:"id" gorm:"primaryKey;autoIncrement"`
+	NaiveId  int    `json:"naiveId" form:"naiveId" gorm:"index"`
+	Username string `json:"username" form:"username"`
+	Password string `json:"password" form:"password"`
+	Enable   bool   `json:"enable" form:"enable" gorm:"default:true"`
+}
+
+func (NaiveUser) TableName() string { return "naive_users" }
+
+// BeforeSave / AfterFind transparently encrypt the user password at rest,
+// matching the NaiveServer.AuthPass scheme.
+func (u *NaiveUser) BeforeSave(_ *gorm.DB) error {
+	enc, err := crypto.EncryptString(u.Password)
+	if err != nil {
+		return err
+	}
+	u.Password = enc
+	return nil
+}
+
+func (u *NaiveUser) AfterFind(_ *gorm.DB) error {
+	dec, err := crypto.DecryptString(u.Password)
+	if err != nil {
+		return err
+	}
+	u.Password = dec
+	return nil
+}
 
 // BeforeSave encrypts the AuthPass field before write so the on-disk
 // SQLite row never contains the plain credential. Idempotent: skips

@@ -147,10 +147,24 @@ async function onResetTraffic(s) {
   if (msg?.success) message.success(t('pages.naive.toasts.trafficReset'));
 }
 
+function urlFor(s, user, pass) {
+  return `naive+https://${encodeURIComponent(user)}:${encodeURIComponent(pass)}@${s.domain}:${s.port}`;
+}
+
 function clientUrl(s) {
-  const user = encodeURIComponent(s.authUser);
-  const pass = encodeURIComponent(s.authPass);
-  return `naive+https://${user}:${pass}@${s.domain}:${s.port}`;
+  return urlFor(s, s.authUser, s.authPass);
+}
+
+// All shareable credentials for a server: the primary auth plus every enabled
+// extra user. Each becomes its own copy target / QR.
+function credsFor(s) {
+  const list = [{ label: s.authUser, url: urlFor(s, s.authUser, s.authPass) }];
+  for (const u of s.users || []) {
+    if (u.enable && u.username) {
+      list.push({ label: u.username, url: urlFor(s, u.username, u.password) });
+    }
+  }
+  return list;
 }
 
 async function onCopy(s) {
@@ -160,6 +174,8 @@ async function onCopy(s) {
 
 const qrOpen = ref(false);
 const qrTarget = ref(null);
+
+const qrCreds = computed(() => (qrTarget.value ? credsFor(qrTarget.value) : []));
 
 function onShowQr(s) {
   qrTarget.value = s;
@@ -505,9 +521,10 @@ const columns = computed(() => [
         :footer="null"
       >
         <QrPanel
-          v-if="qrTarget"
-          :value="clientUrl(qrTarget)"
-          :remark="qrTarget.remark || qrTarget.domain"
+          v-for="cred in qrCreds"
+          :key="cred.label"
+          :value="cred.url"
+          :remark="cred.label"
         />
       </a-modal>
     </a-layout>

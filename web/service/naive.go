@@ -63,13 +63,13 @@ func NewNaiveService() *NaiveService {
 
 func (s *NaiveService) List() ([]*model.NaiveServer, error) {
 	var rows []*model.NaiveServer
-	err := database.GetDB().Order("id asc").Find(&rows).Error
+	err := database.GetDB().Preload("Users").Order("id asc").Find(&rows).Error
 	return rows, err
 }
 
 func (s *NaiveService) Get(id int) (*model.NaiveServer, error) {
 	row := &model.NaiveServer{}
-	if err := database.GetDB().First(row, id).Error; err != nil {
+	if err := database.GetDB().Preload("Users").First(row, id).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, ErrNaiveNotFound
 		}
@@ -78,13 +78,31 @@ func (s *NaiveService) Get(id int) (*model.NaiveServer, error) {
 	return row, nil
 }
 
-// roundTripAuthPass restores the plaintext AuthPass after a write so callers
-// (and JSON responses) keep seeing the original value — gorm BeforeSave
-// encrypted the in-memory struct, which is correct for the DB but wrong for
-// the API response.
-func roundTripAuthPass(srv *model.NaiveServer, original string) {
-	if srv != nil {
-		srv.AuthPass = original
+// snapshotPlain captures the plaintext AuthPass and per-user passwords before a
+// write (gorm BeforeSave encrypts them in place).
+func snapshotPlain(srv *model.NaiveServer) (string, []string) {
+	users := make([]string, len(srv.Users))
+	for i, u := range srv.Users {
+		if u != nil {
+			users[i] = u.Password
+		}
+	}
+	return srv.AuthPass, users
+}
+
+// roundTripAuthPass restores the plaintext AuthPass and user passwords after a
+// write so callers (and JSON responses) keep seeing the original values — gorm
+// BeforeSave encrypted the in-memory structs, which is correct for the DB but
+// wrong for the API response.
+func roundTripAuthPass(srv *model.NaiveServer, original string, userPlain []string) {
+	if srv == nil {
+		return
+	}
+	srv.AuthPass = original
+	for i, u := range srv.Users {
+		if u != nil && i < len(userPlain) {
+			u.Password = userPlain[i]
+		}
 	}
 }
 
@@ -97,11 +115,13 @@ func (s *NaiveService) Add(srv *model.NaiveServer) error {
 			return err
 		}
 	}
-	plain := srv.AuthPass
+	normalizeNaiveUsers(srv)
+	plain, userPlain := snapshotPlain(srv)
+	// gorm's full-association Create persists srv.Users too (NaiveId is filled in).
 	if err := database.GetDB().Create(srv).Error; err != nil {
 		return err
 	}
-	roundTripAuthPass(srv, plain)
+	roundTripAuthPass(srv, plain, userPlain)
 	s.syncTrafficCounters()
 	return nil
 }
@@ -115,13 +135,46 @@ func (s *NaiveService) Update(srv *model.NaiveServer) error {
 			return err
 		}
 	}
-	plain := srv.AuthPass
-	if err := database.GetDB().Save(srv).Error; err != nil {
+	normalizeNaiveUsers(srv)
+	plain, userPlain := snapshotPlain(srv)
+	// Replace the user set: delete existing rows, then recreate from payload.
+	// Simpler and less error-prone than diffing, and the set is always small.
+	err := database.GetDB().Transaction(func(tx *gorm.DB) error {
+		if err := tx.Save(srv).Error; err != nil {
+			return err
+		}
+		if err := tx.Where("naive_id = ?", srv.Id).Delete(&model.NaiveUser{}).Error; err != nil {
+			return err
+		}
+		for _, u := range srv.Users {
+			u.Id = 0
+			u.NaiveId = srv.Id
+			if err := tx.Create(u).Error; err != nil {
+				return err
+			}
+		}
+		return nil
+	})
+	if err != nil {
 		return err
 	}
-	roundTripAuthPass(srv, plain)
+	roundTripAuthPass(srv, plain, userPlain)
 	s.syncTrafficCounters()
 	return nil
+}
+
+// normalizeNaiveUsers drops empty user rows (no username) and clears stale
+// foreign keys / ids so they are (re)created cleanly under the parent server.
+func normalizeNaiveUsers(srv *model.NaiveServer) {
+	kept := srv.Users[:0]
+	for _, u := range srv.Users {
+		if u == nil || strings.TrimSpace(u.Username) == "" {
+			continue
+		}
+		u.NaiveId = srv.Id
+		kept = append(kept, u)
+	}
+	srv.Users = kept
 }
 
 func (s *NaiveService) Delete(id int) error {
@@ -552,6 +605,42 @@ func validateNaive(srv *model.NaiveServer) error {
 	} else if strings.TrimSpace(srv.CertFile) == "" || strings.TrimSpace(srv.KeyFile) == "" {
 		return fmt.Errorf("%w: cert/key required (or enable ACME)", ErrNaiveInvalidConfig)
 	}
+	// extra users: same charset/length rules; usernames must be unique across
+	// the primary user and all extras (duplicate basic_auth users are ambiguous).
+	seen := map[string]bool{srv.AuthUser: true}
+	for _, u := range srv.Users {
+		if u == nil || strings.TrimSpace(u.Username) == "" {
+			continue
+		}
+		if strings.TrimSpace(u.Password) == "" {
+			return fmt.Errorf("%w: user %q requires a password", ErrNaiveInvalidConfig, u.Username)
+		}
+		if err := validateAuthPair(u.Username, u.Password); err != nil {
+			return err
+		}
+		if seen[u.Username] {
+			return fmt.Errorf("%w: duplicate user %q", ErrNaiveInvalidConfig, u.Username)
+		}
+		seen[u.Username] = true
+	}
+	return nil
+}
+
+// validateAuthPair applies the basic_auth charset / length / ':' rules to one
+// username+password pair. Shared by the primary credential and extra users.
+func validateAuthPair(user, pass string) error {
+	if bad := badAuthChar(user); bad != "" {
+		return fmt.Errorf("%w: auth user contains forbidden character %s", ErrNaiveInvalidConfig, bad)
+	}
+	if bad := badAuthChar(pass); bad != "" {
+		return fmt.Errorf("%w: auth pass contains forbidden character %s", ErrNaiveInvalidConfig, bad)
+	}
+	if strings.ContainsRune(user, ':') {
+		return fmt.Errorf("%w: auth user cannot contain ':' (reserved as user/password separator in client URL)", ErrNaiveInvalidConfig)
+	}
+	if len(user) > 64 || len(pass) > 128 {
+		return fmt.Errorf("%w: auth user/pass too long (max 64 / 128)", ErrNaiveInvalidConfig)
+	}
 	return nil
 }
 
@@ -636,6 +725,12 @@ func renderNaiveCaddyfile(srv *model.NaiveServer) string {
 	b.WriteString("\troute {\n")
 	b.WriteString("\t\tforward_proxy {\n")
 	fmt.Fprintf(&b, "\t\t\tbasic_auth %s %s\n", srv.AuthUser, srv.AuthPass)
+	// extra users: one basic_auth line each (forward_proxy allows many)
+	for _, u := range srv.Users {
+		if u != nil && u.Enable && strings.TrimSpace(u.Username) != "" {
+			fmt.Fprintf(&b, "\t\t\tbasic_auth %s %s\n", u.Username, u.Password)
+		}
+	}
 	b.WriteString("\t\t\thide_ip\n")
 	b.WriteString("\t\t\thide_via\n")
 	b.WriteString("\t\t\tprobe_resistance\n")

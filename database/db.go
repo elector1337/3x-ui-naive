@@ -43,6 +43,7 @@ func initModels() error {
 		&model.Node{},
 		&model.ApiToken{},
 		&model.NaiveServer{},
+		&model.NaiveUser{},
 	}
 	for _, mdl := range models {
 		if err := db.AutoMigrate(mdl); err != nil {
