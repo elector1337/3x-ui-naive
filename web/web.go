@@ -450,8 +450,14 @@ func (s *Server) start(restartXray bool, startTgBot bool) (err error) {
 	go s.naiveService.Restore()
 
 	// sample naive per-port traffic from kernel nftables counters into the DB
-	// (Linux + root only; a graceful no-op everywhere else)
+	// (Linux + root only; a graceful no-op everywhere else), then enforce
+	// quota/expiry by stopping depleted servers
 	s.cron.AddJob("@every 30s", job.NewNaiveTrafficJob(s.naiveService))
+
+	// periodic naive counter resets (mirrors the inbound reset cadence)
+	s.cron.AddJob("@daily", job.NewNaiveTrafficResetJob(s.naiveService, "day"))
+	s.cron.AddJob("@weekly", job.NewNaiveTrafficResetJob(s.naiveService, "week"))
+	s.cron.AddJob("@monthly", job.NewNaiveTrafficResetJob(s.naiveService, "month"))
 
 	if startTgBot {
 		isTgbotenabled, err := s.settingService.GetTgbotEnabled()

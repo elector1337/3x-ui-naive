@@ -12,6 +12,28 @@ Versions are tagged against the upstream commit the fork is based on.
 
 ### Added
 
+#### Naive traffic limits, expiry & auto-stop
+
+- New `total` (quota, bytes), `expiryTime` (absolute ms), `trafficReset`
+  (never|day|week|month) and `lastTrafficResetTime` columns on
+  `naive_servers` (gorm auto-migrated).
+- The naive traffic job (already running every 30 s) now enforces quota and
+  expiry: a running server that reaches `total` bytes or passes `expiryTime`
+  is stopped. `enable` is left untouched, so it resumes automatically once
+  the counter is reset or the expiry extended.
+- Periodic counter resets via cron (`@daily` / `@weekly` / `@monthly`),
+  mirroring the inbound reset cadence; an enabled, non-expired server that was
+  stopped on quota is restarted right after its reset.
+- New endpoint reuse: quota/expiry are edited in the add/edit form (traffic
+  limit in GB, expiry date-time picker, auto-reset schedule).
+- UI shows **Depleted** / **Expired** badges in the status column.
+
+#### QR code / share-link generator
+
+- QR button on each naive server (desktop table + mobile card) opens a modal
+  rendering the client URL as a QR code, reusing the inbounds `QrPanel`
+  component (copy-text and copy/download-PNG included). No new dependencies.
+
 #### Naive traffic stats
 
 - Per-server upload / download byte counters, shown in a new **Traffic**

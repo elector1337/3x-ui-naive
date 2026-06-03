@@ -2,6 +2,7 @@
 import { computed, ref, watch } from 'vue';
 import { useI18n } from 'vue-i18n';
 import { message } from 'ant-design-vue';
+import dayjs from 'dayjs';
 import { HttpUtil } from '@/utils';
 
 const props = defineProps({
@@ -31,11 +32,29 @@ function blank() {
     extraArgs: '',
     useRawConfig: false,
     rawConfig: '',
+    total: 0,
+    expiryTime: 0,
+    trafficReset: 'never',
   };
 }
 
 const form = ref(blank());
 const saving = ref(false);
+
+const GB = 1024 * 1024 * 1024;
+
+// Quota is stored in bytes but entered in GB. 0 = unlimited.
+const totalGB = computed({
+  get: () => (form.value.total > 0 ? +(form.value.total / GB).toFixed(2) : 0),
+  set: (v) => { form.value.total = v > 0 ? Math.round(v * GB) : 0; },
+});
+
+// Expiry is stored as an absolute ms timestamp but edited as a date.
+// 0 = never.
+const expiryDate = computed({
+  get: () => (form.value.expiryTime > 0 ? dayjs(form.value.expiryTime) : null),
+  set: (v) => { form.value.expiryTime = v ? v.valueOf() : 0; },
+});
 
 watch(
   () => props.open,
@@ -245,6 +264,31 @@ async function save() {
         <a-col :span="8">
           <a-form-item :label="t('pages.naive.fields.extraArgs')">
             <a-input v-model:value="form.extraArgs" placeholder="--log-net-log=..." />
+          </a-form-item>
+        </a-col>
+      </a-row>
+
+      <a-row :gutter="12">
+        <a-col :span="8">
+          <a-form-item :label="t('pages.naive.fields.totalGB')">
+            <a-input-number v-model:value="totalGB" :min="0" :step="1" style="width: 100%"
+              :placeholder="t('pages.naive.unlimited')" />
+          </a-form-item>
+        </a-col>
+        <a-col :span="8">
+          <a-form-item :label="t('pages.naive.fields.expiryTime')">
+            <a-date-picker v-model:value="expiryDate" show-time style="width: 100%"
+              :placeholder="t('pages.naive.never')" />
+          </a-form-item>
+        </a-col>
+        <a-col :span="8">
+          <a-form-item :label="t('pages.naive.fields.trafficReset')">
+            <a-select v-model:value="form.trafficReset">
+              <a-select-option value="never">{{ t('pages.naive.reset.never') }}</a-select-option>
+              <a-select-option value="day">{{ t('pages.naive.reset.day') }}</a-select-option>
+              <a-select-option value="week">{{ t('pages.naive.reset.week') }}</a-select-option>
+              <a-select-option value="month">{{ t('pages.naive.reset.month') }}</a-select-option>
+            </a-select>
           </a-form-item>
         </a-col>
       </a-row>

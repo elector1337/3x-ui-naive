@@ -55,6 +55,18 @@ func counterID(name string) (id int, isUp, ok bool) {
 	}
 }
 
+// naiveDepleted reports whether a server has hit its traffic quota.
+// Total == 0 means unlimited.
+func naiveDepleted(srv *model.NaiveServer) bool {
+	return srv != nil && srv.Total > 0 && srv.Up+srv.Down >= srv.Total
+}
+
+// naiveExpired reports whether a server is past its expiry time.
+// ExpiryTime == 0 means it never expires. nowMs is the current time in ms.
+func naiveExpired(srv *model.NaiveServer, nowMs int64) bool {
+	return srv != nil && srv.ExpiryTime > 0 && nowMs >= srv.ExpiryTime
+}
+
 // nftBin is the resolved path to the nft binary, "" if unavailable. Looked up
 // lazily and cached for the process lifetime.
 var nftBin string

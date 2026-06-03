@@ -201,6 +201,76 @@ func (s *NaiveService) ResetTraffic(id int) error {
 	})
 }
 
+// EnforceQuotas stops any running server that has hit its traffic quota or
+// passed its expiry time. The process is left stopped (Enable is untouched) so
+// it comes back automatically once the quota is reset or the expiry extended.
+// Best-effort: called by the naive traffic job after each sample.
+func (s *NaiveService) EnforceQuotas() {
+	rows, err := s.List()
+	if err != nil {
+		logger.Warningf("naive quota: list: %v", err)
+		return
+	}
+	now := time.Now().UnixMilli()
+	for _, srv := range rows {
+		if !naiveDepleted(srv) && !naiveExpired(srv, now) {
+			continue
+		}
+		if s.Status(srv.Id).Running {
+			if err := s.Stop(srv.Id); err != nil {
+				logger.Warningf("naive quota: stop %d: %v", srv.Id, err)
+			} else {
+				reason := "quota reached"
+				if naiveExpired(srv, now) {
+					reason = "expired"
+				}
+				logger.Infof("naive: server %d stopped (%s)", srv.Id, reason)
+			}
+		}
+	}
+}
+
+// ResetTrafficBySchedule zeroes Up/Down for every server whose TrafficReset
+// matches period (day|week|month) and stamps LastTrafficResetTime. Called by
+// the periodic reset cron jobs. Returns the number of servers reset.
+func (s *NaiveService) ResetTrafficBySchedule(period string) (int, error) {
+	var rows []*model.NaiveServer
+	if err := database.GetDB().Where("traffic_reset = ?", period).Find(&rows).Error; err != nil {
+		return 0, err
+	}
+	if len(rows) == 0 {
+		return 0, nil
+	}
+	now := time.Now().UnixMilli()
+	count := 0
+	err := submitTrafficWrite(func() error {
+		db := database.GetDB()
+		for _, srv := range rows {
+			if err := db.Model(&model.NaiveServer{}).Where("id = ?", srv.Id).
+				UpdateColumns(map[string]any{
+					"up": 0, "down": 0, "last_traffic_reset_time": now,
+				}).Error; err != nil {
+				return err
+			}
+			count++
+		}
+		return nil
+	})
+	if err != nil {
+		return count, err
+	}
+	// Resume servers that were stopped on quota: now that the counter is zero,
+	// an enabled, non-expired server should come back up.
+	for _, srv := range rows {
+		if srv.Enable && !naiveExpired(srv, now) && !s.Status(srv.Id).Running {
+			if startErr := s.Start(srv.Id); startErr != nil {
+				logger.Warningf("naive reset: resume %d: %v", srv.Id, startErr)
+			}
+		}
+	}
+	return count, err
+}
+
 func (s *NaiveService) Status(id int) NaiveStatus {
 	s.mu.Lock()
 	st := NaiveStatus{Id: id}

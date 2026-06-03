@@ -29,10 +29,20 @@ type NaiveServer struct {
 	// by the naive traffic job. They keep accumulating across restarts until an
 	// explicit reset. Caddy's forward_proxy does not report tunnel bytes itself,
 	// so the count comes from a per-port nftables counter (Linux + root only).
-	Up        int64 `json:"up" form:"up" gorm:"default:0"`
-	Down      int64 `json:"down" form:"down" gorm:"default:0"`
-	CreatedAt int64 `json:"createdAt" gorm:"autoCreateTime"`
-	UpdatedAt int64 `json:"updatedAt" gorm:"autoUpdateTime"`
+	Up   int64 `json:"up" form:"up" gorm:"default:0"`
+	Down int64 `json:"down" form:"down" gorm:"default:0"`
+	// Total is the traffic quota in bytes (Up+Down); 0 = unlimited. When the
+	// quota is reached the naive traffic job stops the process.
+	Total int64 `json:"total" form:"total" gorm:"default:0"`
+	// ExpiryTime is an absolute expiry timestamp in milliseconds; 0 = never.
+	// Past expiry the naive traffic job stops the process.
+	ExpiryTime int64 `json:"expiryTime" form:"expiryTime" gorm:"default:0"`
+	// TrafficReset is the periodic counter-reset schedule: never|day|week|month.
+	TrafficReset string `json:"trafficReset" form:"trafficReset" gorm:"default:never"`
+	// LastTrafficResetTime records when the periodic reset last ran (ms).
+	LastTrafficResetTime int64 `json:"lastTrafficResetTime" form:"lastTrafficResetTime" gorm:"default:0"`
+	CreatedAt            int64 `json:"createdAt" gorm:"autoCreateTime"`
+	UpdatedAt            int64 `json:"updatedAt" gorm:"autoUpdateTime"`
 }
 
 func (NaiveServer) TableName() string { return "naive_servers" }

@@ -454,8 +454,16 @@
         "logLevel": "Log level",
         "extraArgs": "Extra args",
         "advanced": "Advanced",
-        "rawConfig": "Caddyfile"
+        "rawConfig": "Caddyfile",
+        "totalGB": "Traffic limit (GB)",
+        "expiryTime": "Expiry date",
+        "trafficReset": "Auto reset"
       },
+      "unlimited": "Unlimited",
+      "never": "Never",
+      "depleted": "Depleted",
+      "expired": "Expired",
+      "reset": { "never": "Never", "day": "Daily", "week": "Weekly", "month": "Monthly" },
       "toasts": {
         "deleted": "Deleted",
         "started": "Started",

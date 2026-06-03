@@ -454,8 +454,16 @@
         "logLevel": "Уровень логов",
         "extraArgs": "Доп. аргументы",
         "advanced": "Продвинутый",
-        "rawConfig": "Caddyfile"
+        "rawConfig": "Caddyfile",
+        "totalGB": "Лимит трафика (ГБ)",
+        "expiryTime": "Дата истечения",
+        "trafficReset": "Авто-сброс"
       },
+      "unlimited": "Безлимит",
+      "never": "Никогда",
+      "depleted": "Исчерпан",
+      "expired": "Истёк",
+      "reset": { "never": "Никогда", "day": "Ежедневно", "week": "Еженедельно", "month": "Ежемесячно" },
       "toasts": {
         "deleted": "Удалено",
         "started": "Запущено",

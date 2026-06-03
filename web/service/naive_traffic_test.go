@@ -167,6 +167,90 @@ func TestApplyTrafficDeltas_AccumulatesAndResets(t *testing.T) {
 	}
 }
 
+func TestNaiveDepleted(t *testing.T) {
+	cases := []struct {
+		name string
+		srv  *model.NaiveServer
+		want bool
+	}{
+		{"unlimited", &model.NaiveServer{Total: 0, Up: 1 << 40, Down: 1 << 40}, false},
+		{"under quota", &model.NaiveServer{Total: 1000, Up: 400, Down: 400}, false},
+		{"exactly at quota", &model.NaiveServer{Total: 1000, Up: 600, Down: 400}, true},
+		{"over quota", &model.NaiveServer{Total: 1000, Up: 900, Down: 900}, true},
+		{"nil", nil, false},
+	}
+	for _, c := range cases {
+		if got := naiveDepleted(c.srv); got != c.want {
+			t.Errorf("%s: naiveDepleted = %v, want %v", c.name, got, c.want)
+		}
+	}
+}
+
+func TestNaiveExpired(t *testing.T) {
+	now := int64(1_000_000)
+	cases := []struct {
+		name string
+		srv  *model.NaiveServer
+		want bool
+	}{
+		{"never", &model.NaiveServer{ExpiryTime: 0}, false},
+		{"future", &model.NaiveServer{ExpiryTime: now + 1}, false},
+		{"exactly now", &model.NaiveServer{ExpiryTime: now}, true},
+		{"past", &model.NaiveServer{ExpiryTime: now - 1}, true},
+		{"nil", nil, false},
+	}
+	for _, c := range cases {
+		if got := naiveExpired(c.srv, now); got != c.want {
+			t.Errorf("%s: naiveExpired = %v, want %v", c.name, got, c.want)
+		}
+	}
+}
+
+// TestResetTrafficBySchedule_OnlyMatchingPeriod verifies that only servers with
+// the matching TrafficReset schedule are zeroed.
+func TestResetTrafficBySchedule_OnlyMatchingPeriod(t *testing.T) {
+	setupConflictDB(t)
+	crypto.SetEncryptionKeyPath(filepath.Join(t.TempDir(), "encryption.key"))
+	StartTrafficWriter()
+	t.Cleanup(StopTrafficWriter)
+
+	svc := NewNaiveService()
+	daily := &model.NaiveServer{Remark: "d", Port: 8443, Domain: "d.example.com", CertFile: "/x", KeyFile: "/y", AuthUser: "u", AuthPass: "p", TrafficReset: "day"}
+	weekly := &model.NaiveServer{Remark: "w", Port: 9443, Domain: "w.example.com", CertFile: "/x", KeyFile: "/y", AuthUser: "u", AuthPass: "p", TrafficReset: "week"}
+	if err := svc.Add(daily); err != nil {
+		t.Fatalf("add daily: %v", err)
+	}
+	if err := svc.Add(weekly); err != nil {
+		t.Fatalf("add weekly: %v", err)
+	}
+	if err := svc.applyTrafficDeltas(map[int]naiveTrafficDelta{
+		daily.Id:  {Up: 100, Down: 100},
+		weekly.Id: {Up: 100, Down: 100},
+	}); err != nil {
+		t.Fatalf("seed traffic: %v", err)
+	}
+
+	n, err := svc.ResetTrafficBySchedule("day")
+	if err != nil {
+		t.Fatalf("reset day: %v", err)
+	}
+	if n != 1 {
+		t.Errorf("expected 1 server reset, got %d", n)
+	}
+
+	gotDaily, _ := svc.Get(daily.Id)
+	if gotDaily.Up != 0 || gotDaily.Down != 0 {
+		t.Errorf("daily should be reset, got %d/%d", gotDaily.Up, gotDaily.Down)
+	}
+	if gotDaily.LastTrafficResetTime == 0 {
+		t.Error("daily LastTrafficResetTime should be stamped")
+	}
+	gotWeekly, _ := svc.Get(weekly.Id)
+	if gotWeekly.Up != 100 || gotWeekly.Down != 100 {
+		t.Errorf("weekly should be untouched, got %d/%d", gotWeekly.Up, gotWeekly.Down)
+	}
+}
+
 // nftAvailable must be a safe no-op gate on non-Linux dev machines.
 func TestNftUnavailableIsNoOp(t *testing.T) {
 	if nftAvailable() {

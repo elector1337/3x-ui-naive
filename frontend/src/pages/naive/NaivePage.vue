@@ -170,6 +170,14 @@ function isRunning(id) {
   return !!statuses.value[id]?.running;
 }
 
+function isDepleted(s) {
+  return s.total > 0 && (s.up || 0) + (s.down || 0) >= s.total;
+}
+
+function isExpired(s) {
+  return s.expiryTime > 0 && Date.now() >= s.expiryTime;
+}
+
 const totals = computed(() => {
   const list = servers.value;
   let running = 0;
@@ -305,6 +313,8 @@ const columns = computed(() => [
                         >{{ t('pages.naive.unresponsive') }}</a-tag>
                         <a-tag v-else-if="isRunning(srv.id)" color="processing">{{ t('pages.naive.starting') }}</a-tag>
                         <a-tag v-else color="default">{{ t('pages.naive.stopped') }}</a-tag>
+                        <a-tag v-if="isExpired(srv)" color="error">{{ t('pages.naive.expired') }}</a-tag>
+                        <a-tag v-else-if="isDepleted(srv)" color="error">{{ t('pages.naive.depleted') }}</a-tag>
                       </div>
                       <div class="srv-row">
                         <span class="srv-label">Endpoint</span>
@@ -394,6 +404,8 @@ const columns = computed(() => [
                           {{ t('pages.naive.starting') }}
                         </a-tag>
                         <a-tag v-else color="default">{{ t('pages.naive.stopped') }}</a-tag>
+                        <a-tag v-if="isExpired(record)" color="error">{{ t('pages.naive.expired') }}</a-tag>
+                        <a-tag v-else-if="isDepleted(record)" color="error">{{ t('pages.naive.depleted') }}</a-tag>
                       </template>
 
                       <template v-else-if="column.key === 'traffic'">

@@ -16,7 +16,8 @@ func NewNaiveTrafficJob(naiveService *service.NaiveService) *NaiveTrafficJob {
 	return &NaiveTrafficJob{naiveService: naiveService}
 }
 
-// Run is the cron.Job interface method invoked on schedule.
+// Run is the cron.Job interface method invoked on schedule. It samples kernel
+// counters into the DB, then stops any server that has hit its quota or expired.
 func (j *NaiveTrafficJob) Run() {
 	if j.naiveService == nil {
 		return
@@ -24,4 +25,5 @@ func (j *NaiveTrafficJob) Run() {
 	if err := j.naiveService.SampleTraffic(); err != nil {
 		logger.Warningf("naive traffic job: %v", err)
 	}
+	j.naiveService.EnforceQuotas()
 }
