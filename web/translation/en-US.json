@@ -451,6 +451,7 @@
         "certFile": "Cert file path",
         "keyFile": "Key file path",
         "padding": "Padding",
+        "enableH3": "HTTP/3",
         "logLevel": "Log level",
         "extraArgs": "Extra args",
         "advanced": "Advanced",

@@ -29,6 +29,7 @@ function blank() {
     authUser: '',
     authPass: '',
     padding: true,
+    enableH3: true,
     logLevel: 'WARN',
     extraArgs: '',
     useRawConfig: false,
@@ -257,9 +258,14 @@ async function save() {
       </template>
 
       <a-row :gutter="12">
-        <a-col :span="8">
+        <a-col :span="4">
           <a-form-item :label="t('pages.naive.fields.padding')">
             <a-switch v-model:checked="form.padding" />
+          </a-form-item>
+        </a-col>
+        <a-col :span="4">
+          <a-form-item :label="t('pages.naive.fields.enableH3')">
+            <a-switch v-model:checked="form.enableH3" />
           </a-form-item>
         </a-col>
         <a-col :span="8">

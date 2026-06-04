@@ -710,6 +710,12 @@ func renderNaiveCaddyfile(srv *model.NaiveServer) string {
 	b.WriteString("{\n")
 	b.WriteString("\tadmin off\n")
 	fmt.Fprintf(&b, "\tlog {\n\t\tlevel %s\n\t}\n", level)
+	// HTTP/3 (QUIC) is on by default in Caddy. When the user disables it we
+	// pin the server to h1+h2, dropping the UDP/QUIC listener and the
+	// Alt-Svc: h3 advertisement (useful where UDP is blocked or unwanted).
+	if !srv.EnableH3 {
+		b.WriteString("\tservers {\n\t\tprotocols h1 h2\n\t}\n")
+	}
 	b.WriteString("}\n\n")
 
 	fmt.Fprintf(&b, ":%d, %s {\n", srv.Port, srv.Domain)

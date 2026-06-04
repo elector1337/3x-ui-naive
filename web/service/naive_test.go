@@ -129,6 +129,31 @@ func TestRenderCaddyfile_MultiUser(t *testing.T) {
 	}
 }
 
+func TestRenderCaddyfile_H3Toggle(t *testing.T) {
+	base := func() *model.NaiveServer {
+		return &model.NaiveServer{
+			Port: 443, Domain: "x.example.com", CertFile: "/a", KeyFile: "/b",
+			AuthUser: "u", AuthPass: "p",
+		}
+	}
+	// h3 enabled (default): no protocols override emitted.
+	on := base()
+	on.EnableH3 = true
+	if out := RenderCaddyfile(on); strings.Contains(out, "protocols") {
+		t.Errorf("h3 on should not emit a protocols directive\n%s", out)
+	}
+	// h3 disabled: pin to h1 h2.
+	off := base()
+	off.EnableH3 = false
+	out := RenderCaddyfile(off)
+	if !strings.Contains(out, "servers {") || !strings.Contains(out, "protocols h1 h2") {
+		t.Errorf("h3 off should pin protocols to h1 h2\n%s", out)
+	}
+	if strings.Contains(out, "h3") {
+		t.Errorf("h3 off must not list h3\n%s", out)
+	}
+}
+
 func TestValidateNaive_RejectsDuplicateUser(t *testing.T) {
 	srv := &model.NaiveServer{
 		Port: 443, Domain: "x.example.com", CertFile: "/a", KeyFile: "/b",

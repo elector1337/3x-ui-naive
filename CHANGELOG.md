@@ -8,6 +8,19 @@ Versions are tagged against the upstream commit the fork is based on.
 
 ---
 
+## [Unreleased] — feature/naive-proxy
+
+### Added
+
+#### HTTP/3 (QUIC) toggle
+
+- New `enableH3` switch on naive servers (on by default, matching Caddy).
+  Turning it off emits `servers { protocols h1 h2 }`, dropping the UDP/QUIC
+  listener and the `Alt-Svc: h3` advertisement — useful where UDP is blocked.
+- Verified both states against a real `caddy adapt`.
+
+---
+
 ## [0.3.0] — 2026-06-03
 
 ### Added

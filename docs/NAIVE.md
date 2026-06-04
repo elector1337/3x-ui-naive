@@ -59,6 +59,7 @@ sudo setcap cap_net_bind_service=+ep <путь_к_caddy>
 | `authUser`     | basic auth пользователь                                          |
 | `authPass`     | basic auth пароль                                                |
 | `padding`      | включить HTTP/2 padding (рекомендуется)                          |
+| `enableH3`     | HTTP/3 (QUIC); вкл по умолчанию. Выкл → `servers { protocols h1 h2 }`, без UDP/QUIC и `Alt-Svc: h3` |
 | `logLevel`     | `DEBUG` / `INFO` / `WARN` / `ERROR`                              |
 | `extraArgs`    | доп. CLI-аргументы caddy, через пробел                           |
 | `useRawConfig` | флаг: показывать редактор Caddyfile вместо простой формы         |

@@ -451,6 +451,7 @@
         "certFile": "Путь к cert",
         "keyFile": "Путь к key",
         "padding": "Padding",
+        "enableH3": "HTTP/3",
         "logLevel": "Уровень логов",
         "extraArgs": "Доп. аргументы",
         "advanced": "Продвинутый",
