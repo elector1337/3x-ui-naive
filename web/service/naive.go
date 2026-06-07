@@ -8,6 +8,7 @@ import (
 	"io"
 	"net"
 	"net/http"
+	"net/url"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -65,6 +66,53 @@ func (s *NaiveService) List() ([]*model.NaiveServer, error) {
 	var rows []*model.NaiveServer
 	err := database.GetDB().Preload("Users").Order("id asc").Find(&rows).Error
 	return rows, err
+}
+
+// naiveClientURL builds a NaiveProxy client URL for one credential.
+// Format: naive+https://USER:PASS@DOMAIN:PORT#REMARK (remark fragment optional).
+func naiveClientURL(domain string, port int, user, pass, remark string) string {
+	u := url.URL{
+		Scheme: "naive+https",
+		User:   url.UserPassword(user, pass),
+		Host:   fmt.Sprintf("%s:%d", domain, port),
+	}
+	link := u.String()
+	if remark != "" {
+		link += "#" + url.PathEscape(remark)
+	}
+	return link
+}
+
+// SubLinks returns the naive client URLs that belong to subscription subId:
+// for every enabled server tagged with that SubId, the primary credential plus
+// each enabled extra user. Raw-config servers are skipped (the panel doesn't
+// know their domain/port/credentials). Returns nil when subId is empty or
+// nothing matches — callers append the result to the subscription output.
+func (s *NaiveService) SubLinks(subId string) []string {
+	if strings.TrimSpace(subId) == "" {
+		return nil
+	}
+	var rows []*model.NaiveServer
+	if err := database.GetDB().Preload("Users").
+		Where("sub_id = ? AND enable = ? AND use_raw_config = ?", subId, true, false).
+		Order("id asc").Find(&rows).Error; err != nil {
+		logger.Warningf("naive sub: query %q: %v", subId, err)
+		return nil
+	}
+	var links []string
+	for _, srv := range rows {
+		if srv.Domain == "" || srv.Port <= 0 {
+			continue
+		}
+		base := firstNonEmpty(srv.Remark, srv.Domain)
+		links = append(links, naiveClientURL(srv.Domain, srv.Port, srv.AuthUser, srv.AuthPass, base))
+		for _, u := range srv.Users {
+			if u != nil && u.Enable && strings.TrimSpace(u.Username) != "" {
+				links = append(links, naiveClientURL(srv.Domain, srv.Port, u.Username, u.Password, base+"-"+u.Username))
+			}
+		}
+	}
+	return links
 }
 
 func (s *NaiveService) Get(id int) (*model.NaiveServer, error) {

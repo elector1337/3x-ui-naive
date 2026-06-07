@@ -31,6 +31,7 @@ type SubService struct {
 	emailInRemark  bool
 	inboundService service.InboundService
 	settingService service.SettingService
+	naiveService   *service.NaiveService
 	// nodesByID is populated per request from the Node table so
 	// resolveInboundAddress can return the node's address for any
 	// inbound whose NodeID is set. Keeps the per-link host derivation
@@ -41,8 +42,9 @@ type SubService struct {
 // NewSubService creates a new subscription service with the given configuration.
 func NewSubService(showInfo bool, remarkModel string) *SubService {
 	return &SubService{
-		showInfo:    showInfo,
-		remarkModel: remarkModel,
+		showInfo:     showInfo,
+		remarkModel:  remarkModel,
+		naiveService: service.NewNaiveService(),
 	}
 }
 
@@ -70,6 +72,11 @@ func (s *SubService) GetSubs(subId string, host string) ([]string, int64, xray.C
 	}
 
 	if len(inbounds) == 0 {
+		// No xray inbounds, but the subId may still carry naive servers.
+		if naiveLinks := s.naiveService.SubLinks(subId); len(naiveLinks) > 0 {
+			traffic.Enable = true
+			return naiveLinks, 0, traffic, nil
+		}
 		return nil, 0, traffic, common.NewError("No inbounds found with ", subId)
 	}
 
@@ -113,6 +120,14 @@ func (s *SubService) GetSubs(subId string, host string) ([]string, int64, xray.C
 				}
 			}
 		}
+	}
+
+	// Append NaiveProxy servers tagged with this subId (primary + enabled
+	// users). Naive runs as a separate process with no per-client traffic
+	// stats, so these only contribute links, not usage figures.
+	if naiveLinks := s.naiveService.SubLinks(subId); len(naiveLinks) > 0 {
+		result = append(result, naiveLinks...)
+		hasEnabledClient = true
 	}
 
 	// Prepare statistics

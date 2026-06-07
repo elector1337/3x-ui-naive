@@ -12,6 +12,25 @@ Versions are tagged against the upstream commit the fork is based on.
 
 ### Added
 
+#### Naive servers in subscription output
+
+- New `subId` field on naive servers (gorm auto-migrated, indexed). When it
+  matches a requested subscription id, the server's client URLs are appended
+  to that subscription's plain (base64) output: the primary credential plus
+  each enabled extra user, as `naive+https://USER:PASS@DOMAIN:PORT#remark`.
+- Works for naive-only subscriptions too — a subId carrying only naive
+  servers (no xray inbounds) now returns those links instead of 404.
+- Raw-config and disabled servers are skipped; userinfo and remark are
+  URL-escaped. naive has no per-client traffic stats, so it contributes
+  links only (no usage figures).
+- Subscription-ID field added to the add/edit form (en/ru).
+
+#### Fixed
+
+- `NaiveUser.Enable` no longer carries a gorm `default:true`, which had
+  force-enabled users saved with `enable=false` (gorm can't distinguish a
+  false zero-value from "unset").
+
 #### HTTP/3 (QUIC) toggle
 
 - New `enableH3` switch on naive servers (on by default, matching Caddy).

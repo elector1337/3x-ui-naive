@@ -8,9 +8,13 @@ import (
 
 // naive proxy server (runs as external process, not an xray protocol)
 type NaiveServer struct {
-	Id        int    `json:"id" form:"id" gorm:"primaryKey;autoIncrement"`
-	Remark    string `json:"remark" form:"remark"`
-	Enable    bool   `json:"enable" form:"enable" gorm:"default:false"`
+	Id     int    `json:"id" form:"id" gorm:"primaryKey;autoIncrement"`
+	Remark string `json:"remark" form:"remark"`
+	Enable bool   `json:"enable" form:"enable" gorm:"default:false"`
+	// SubId ties this server (and its users) into a subscription. When it
+	// matches a requested subscription id, the server's naive+https client
+	// URLs are appended to that subscription's output. Empty = not included.
+	SubId     string `json:"subId" form:"subId" gorm:"index"`
 	Listen    string `json:"listen" form:"listen"`
 	Port      int    `json:"port" form:"port"`
 	Domain    string `json:"domain" form:"domain"`
@@ -60,7 +64,10 @@ type NaiveUser struct {
 	NaiveId  int    `json:"naiveId" form:"naiveId" gorm:"index"`
 	Username string `json:"username" form:"username"`
 	Password string `json:"password" form:"password"`
-	Enable   bool   `json:"enable" form:"enable" gorm:"default:true"`
+	// No gorm default: a bool default:true would force-enable rows saved with
+	// Enable=false (gorm can't tell a false zero-value from "unset"). The form
+	// always sends an explicit value.
+	Enable bool `json:"enable" form:"enable"`
 }
 
 func (NaiveUser) TableName() string { return "naive_users" }

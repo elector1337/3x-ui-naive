@@ -317,6 +317,63 @@ func TestNaiveUsers_PersistAndReplace(t *testing.T) {
 	}
 }
 
+func TestNaiveClientURL(t *testing.T) {
+	got := naiveClientURL("ex.com", 443, "al ice", "p@s:s", "my remark")
+	// userinfo + remark must be escaped; host carries the port.
+	if !strings.HasPrefix(got, "naive+https://") {
+		t.Fatalf("bad scheme: %s", got)
+	}
+	if !strings.Contains(got, "@ex.com:443") {
+		t.Errorf("missing host:port: %s", got)
+	}
+	if strings.Contains(got, " ") {
+		t.Errorf("url must not contain raw spaces: %s", got)
+	}
+	if !strings.Contains(got, "#") {
+		t.Errorf("expected remark fragment: %s", got)
+	}
+}
+
+// TestNaiveSubLinks selects only enabled, non-raw servers tagged with the subId
+// and emits the primary credential plus each enabled user.
+func TestNaiveSubLinks(t *testing.T) {
+	setupConflictDB(t)
+	crypto.SetEncryptionKeyPath(filepath.Join(t.TempDir(), "encryption.key"))
+	StartTrafficWriter()
+	t.Cleanup(StopTrafficWriter)
+
+	svc := NewNaiveService()
+	add := func(s *model.NaiveServer) {
+		if err := svc.Add(s); err != nil {
+			t.Fatalf("add %s: %v", s.Remark, err)
+		}
+	}
+	add(&model.NaiveServer{Remark: "match", Enable: true, SubId: "sub1", Port: 8443, Domain: "a.com", CertFile: "/x", KeyFile: "/y", AuthUser: "alice", AuthPass: "p1",
+		Users: []*model.NaiveUser{{Username: "bob", Password: "p2", Enable: true}, {Username: "carol", Password: "p3", Enable: false}}})
+	add(&model.NaiveServer{Remark: "othersub", Enable: true, SubId: "sub2", Port: 9443, Domain: "b.com", CertFile: "/x", KeyFile: "/y", AuthUser: "u", AuthPass: "p"})
+	add(&model.NaiveServer{Remark: "disabled", Enable: false, SubId: "sub1", Port: 9543, Domain: "c.com", CertFile: "/x", KeyFile: "/y", AuthUser: "u", AuthPass: "p"})
+
+	links := svc.SubLinks("sub1")
+	// primary (alice) + enabled user (bob); carol disabled, othersub/disabled excluded
+	if len(links) != 2 {
+		t.Fatalf("expected 2 links, got %d: %v", len(links), links)
+	}
+	joined := strings.Join(links, "\n")
+	for _, want := range []string{"alice:p1@a.com:8443", "bob:p2@a.com:8443"} {
+		if !strings.Contains(joined, want) {
+			t.Errorf("missing %q in:\n%s", want, joined)
+		}
+	}
+	for _, no := range []string{"carol", "b.com", "c.com"} {
+		if strings.Contains(joined, no) {
+			t.Errorf("unexpected %q in:\n%s", no, joined)
+		}
+	}
+	if svc.SubLinks("") != nil {
+		t.Error("empty subId must return nil")
+	}
+}
+
 // nftAvailable must be a safe no-op gate on non-Linux dev machines.
 func TestNftUnavailableIsNoOp(t *testing.T) {
 	if nftAvailable() {

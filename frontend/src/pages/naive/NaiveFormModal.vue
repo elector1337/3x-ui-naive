@@ -19,6 +19,7 @@ function blank() {
   return {
     remark: '',
     enable: false,
+    subId: '',
     listen: '',
     port: 443,
     domain: '',
@@ -175,6 +176,14 @@ async function save() {
               :checked="form.useRawConfig"
               @change="onToggleRaw"
             />
+          </a-form-item>
+        </a-col>
+      </a-row>
+
+      <a-row :gutter="12">
+        <a-col :span="24">
+          <a-form-item :label="t('pages.naive.fields.subId')" :help="t('pages.naive.subIdHint')">
+            <a-input v-model:value="form.subId" placeholder="my-subscription" />
           </a-form-item>
         </a-col>
       </a-row>
