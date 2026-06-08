@@ -12,6 +12,14 @@ Versions are tagged against the upstream commit the fork is based on.
 
 ### Added
 
+#### Naive servers in the Telegram bot
+
+- New **Get Naive** button (and `naive` callback) in the admin keyboard
+  reports every naive server: remark, running/stopped state, port, up/down
+  traffic (kernel-sampled) and expiry — mirroring the inbound usage report.
+- Empty / error states handled with their own messages; en + ru strings
+  added, other locales fall back to English.
+
 #### Naive servers in subscription output
 
 - New `subId` field on naive servers (gorm auto-migrated, indexed). When it

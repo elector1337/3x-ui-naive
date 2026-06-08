@@ -121,12 +121,13 @@ type Tgbot struct {
 	settingService SettingService
 	serverService  ServerService
 	xrayService    XrayService
+	naiveService   *NaiveService
 	lastStatus     *Status
 }
 
 // NewTgbot creates a new Tgbot instance.
 func (t *Tgbot) NewTgbot() *Tgbot {
-	return new(Tgbot)
+	return &Tgbot{naiveService: NewNaiveService()}
 }
 
 // I18nBot retrieves a localized message for the bot interface.
@@ -1655,6 +1656,13 @@ func (t *Tgbot) answerCallback(callbackQuery *telego.CallbackQuery, isAdmin bool
 	case "inbounds":
 		t.sendCallbackAnswerTgBot(callbackQuery.ID, t.I18nBot("tgbot.buttons.getInbounds"))
 		t.SendMsgToTgbot(chatId, t.getInboundUsages())
+	case "naive":
+		t.sendCallbackAnswerTgBot(callbackQuery.ID, t.I18nBot("tgbot.buttons.getNaive"))
+		msg := t.getNaiveUsages()
+		if msg == "" {
+			msg = t.I18nBot("tgbot.answers.noNaive")
+		}
+		t.SendMsgToTgbot(chatId, msg)
 	case "deplete_soon":
 		t.sendCallbackAnswerTgBot(callbackQuery.ID, t.I18nBot("tgbot.buttons.depleteSoon"))
 		t.getExhausted(chatId)
@@ -2253,6 +2261,9 @@ func (t *Tgbot) SendAnswer(chatId int64, msg string, isAdmin bool) {
 		tu.InlineKeyboardRow(
 			tu.InlineKeyboardButton(t.I18nBot("tgbot.buttons.getInbounds")).WithCallbackData(t.encodeQuery("inbounds")),
 			tu.InlineKeyboardButton(t.I18nBot("tgbot.buttons.depleteSoon")).WithCallbackData(t.encodeQuery("deplete_soon")),
+		),
+		tu.InlineKeyboardRow(
+			tu.InlineKeyboardButton(t.I18nBot("tgbot.buttons.getNaive")).WithCallbackData(t.encodeQuery("naive")),
 		),
 		tu.InlineKeyboardRow(
 			tu.InlineKeyboardButton(t.I18nBot("tgbot.buttons.commands")).WithCallbackData(t.encodeQuery("commands")),
@@ -2860,6 +2871,38 @@ func (t *Tgbot) getInboundUsages() string {
 			}
 			info.WriteString("\r\n")
 		}
+	}
+	return info.String()
+}
+
+// getNaiveUsages retrieves and formats NaiveProxy server usage information,
+// mirroring getInboundUsages. naive has no per-client stats, so this reports
+// per-server up/down (kernel-sampled), quota, expiry and running state.
+func (t *Tgbot) getNaiveUsages() string {
+	var info strings.Builder
+	servers, err := t.naiveService.List()
+	if err != nil {
+		logger.Warning("naive List for tgbot failed:", err)
+		return t.I18nBot("tgbot.answers.getNaiveFailed")
+	}
+	if len(servers) == 0 {
+		return ""
+	}
+	info.WriteString(t.I18nBot("tgbot.messages.naiveHeader"))
+	for _, srv := range servers {
+		state := t.I18nBot("tgbot.messages.naiveStopped")
+		if t.naiveService.Status(srv.Id).Running {
+			state = t.I18nBot("tgbot.messages.naiveRunning")
+		}
+		info.WriteString(t.I18nBot("tgbot.messages.naiveServer", "Remark=="+srv.Remark, "State=="+state))
+		info.WriteString(t.I18nBot("tgbot.messages.port", "Port=="+strconv.Itoa(srv.Port)))
+		info.WriteString(t.I18nBot("tgbot.messages.traffic", "Total=="+common.FormatTraffic(srv.Up+srv.Down), "Upload=="+common.FormatTraffic(srv.Up), "Download=="+common.FormatTraffic(srv.Down)))
+		if srv.ExpiryTime == 0 {
+			info.WriteString(t.I18nBot("tgbot.messages.expire", "Time=="+t.I18nBot("tgbot.unlimited")))
+		} else {
+			info.WriteString(t.I18nBot("tgbot.messages.expire", "Time=="+time.Unix((srv.ExpiryTime/1000), 0).Format("2006-01-02 15:04:05")))
+		}
+		info.WriteString("\r\n")
 	}
 	return info.String()
 }

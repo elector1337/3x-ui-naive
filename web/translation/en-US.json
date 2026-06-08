@@ -416,7 +416,11 @@
       "trafficCol": "Traffic",
       "trafficHint": "Upload / download bytes counted by the kernel (Linux + root). Zero on other platforms.",
       "resetTraffic": "Reset traffic",
-      "totals": { "total": "Total", "running": "Running", "stopped": "Stopped" },
+      "totals": {
+        "total": "Total",
+        "running": "Running",
+        "stopped": "Stopped"
+      },
       "copyUrl": "Copy client URL",
       "showQr": "Show QR code",
       "qrTitle": "QR code — {name}",
@@ -468,7 +472,12 @@
       "subIdHint": "Include this server's client URLs in the matching subscription. Leave empty to exclude.",
       "usersSection": "Additional users",
       "addUser": "Add user",
-      "reset": { "never": "Never", "day": "Daily", "week": "Weekly", "month": "Monthly" },
+      "reset": {
+        "never": "Never",
+        "day": "Daily",
+        "week": "Weekly",
+        "month": "Monthly"
+      },
       "toasts": {
         "deleted": "Deleted",
         "started": "Started",
@@ -999,7 +1008,11 @@
       "AreYouSure": "Are you sure? 🤔",
       "SuccessResetTraffic": "📧 Email: {{ .ClientEmail }}\n🏁 Result: ✅ Success",
       "FailedResetTraffic": "📧 Email: {{ .ClientEmail }}\n🏁 Result: ❌ Failed \n\n🛠️ Error: [ {{ .ErrorMessage }} ]",
-      "FinishProcess": "🔚 Traffic reset process finished for all clients."
+      "FinishProcess": "🔚 Traffic reset process finished for all clients.",
+      "naiveHeader": "🌐 NaiveProxy servers:\r\n\r\n",
+      "naiveServer": "📍 Naive: {{ .Remark }} ({{ .State }})\r\n",
+      "naiveRunning": "running",
+      "naiveStopped": "stopped"
     },
     "buttons": {
       "closeKeyboard": "❌ Close Keyboard",
@@ -1044,7 +1057,8 @@
       "change_comment": "⚙️💬 Comment",
       "change_flow": "⚙️🚦 Flow",
       "ResetAllTraffics": "Reset All Traffic",
-      "SortedTrafficUsageReport": "Sorted Traffic Usage Report"
+      "SortedTrafficUsageReport": "Sorted Traffic Usage Report",
+      "getNaive": "Get Naive"
     },
     "answers": {
       "successfulOperation": "✅ Operation successful!",
@@ -1067,7 +1081,9 @@
       "disableSuccess": "✅ {{ .Email }}: Disabled successfully.",
       "askToAddUserId": "Your configuration is not found!\r\nPlease ask your admin to use your Telegram ChatID in your configuration(s).\r\n\r\nYour ChatID: <code>{{ .TgUserID }}</code>",
       "chooseClient": "Choose a Client for Inbound {{ .Inbound }}",
-      "chooseInbound": "Choose an Inbound"
+      "chooseInbound": "Choose an Inbound",
+      "getNaiveFailed": "❌ Failed to get naive servers.",
+      "noNaive": "ℹ️ No naive servers configured."
     }
   }
 }
