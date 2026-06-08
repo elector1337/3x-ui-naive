@@ -19,6 +19,7 @@ on:
   push:
     branches:
       - main
+      - feature/naive-proxy
     paths:
       - "**.go"
       - "go.mod"

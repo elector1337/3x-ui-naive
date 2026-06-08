@@ -54,7 +54,10 @@ jobs:
         uses: actions/setup-go@v6
         with:
           go-version-file: go.mod
-          check-latest: true
+          # check-latest:false (default) — use setup-go's cached toolchain
+          # instead of resolving the latest Go manifest on every run, which
+          # has flaked with DNS/network timeouts on the Windows runner.
+          check-latest: false
 
       # Frontend dist must be built BEFORE go build — Go's //go:embed
       # all:dist directive in web/web.go requires web/dist/ to exist
@@ -196,7 +199,10 @@ jobs:
         uses: actions/setup-go@v6
         with:
           go-version-file: go.mod
-          check-latest: true
+          # check-latest:false (default) — use setup-go's cached toolchain
+          # instead of resolving the latest Go manifest on every run, which
+          # has flaked with DNS/network timeouts on the Windows runner.
+          check-latest: false
 
       # Frontend dist must be built BEFORE go build — see comment on the
       # Linux job above. This step is identical except npm runs on the
