@@ -24,7 +24,13 @@ type NaiveServer struct {
 	KeyFile   string `json:"keyFile" form:"keyFile"`
 	AuthUser  string `json:"authUser" form:"authUser"`
 	AuthPass  string `json:"authPass" form:"authPass"`
-	Padding   bool   `json:"padding" form:"padding" gorm:"default:true"`
+	// IPLimit is the maximum number of distinct client IPs allowed per user
+	// (primary + each extra user). 0 = unlimited. When >0 the panel enables a
+	// per-site JSON access log and the naive IP job bans excess IPs via
+	// nftables (Linux + root). Excess bans carry a timeout, so an IP that
+	// stops exceeding the limit is unbanned automatically.
+	IPLimit int  `json:"ipLimit" form:"ipLimit" gorm:"default:0"`
+	Padding bool `json:"padding" form:"padding" gorm:"default:true"`
 	// EnableH3 advertises and serves HTTP/3 (QUIC). On by default (Caddy's
 	// default); disabling it pins the server to h1+h2.
 	EnableH3     bool   `json:"enableH3" form:"enableH3" gorm:"default:true"`

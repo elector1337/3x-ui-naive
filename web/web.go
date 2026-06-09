@@ -454,6 +454,11 @@ func (s *Server) start(restartXray bool, startTgBot bool) (err error) {
 	// quota/expiry by stopping depleted servers
 	s.cron.AddJob("@every 30s", job.NewNaiveTrafficJob(s.naiveService))
 
+	// enforce per-user naive IP limits from the access log via nftables bans
+	// (Linux + root; no-op otherwise). Runs more often than traffic for a
+	// quicker reaction to a shared credential.
+	s.cron.AddJob("@every 20s", job.NewNaiveIpJob(s.naiveService))
+
 	// periodic naive counter resets (mirrors the inbound reset cadence)
 	s.cron.AddJob("@daily", job.NewNaiveTrafficResetJob(s.naiveService, "day"))
 	s.cron.AddJob("@weekly", job.NewNaiveTrafficResetJob(s.naiveService, "week"))

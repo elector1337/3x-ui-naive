@@ -457,6 +457,7 @@
         "padding": "Padding",
         "enableH3": "HTTP/3",
         "subId": "Subscription ID",
+        "ipLimit": "IP limit",
         "logLevel": "Log level",
         "extraArgs": "Extra args",
         "advanced": "Advanced",
@@ -470,6 +471,7 @@
       "depleted": "Depleted",
       "expired": "Expired",
       "subIdHint": "Include this server's client URLs in the matching subscription. Leave empty to exclude.",
+      "ipLimitHint": "Max distinct IPs per user; excess IPs are banned via nftables (Linux + root). 0 = unlimited.",
       "usersSection": "Additional users",
       "addUser": "Add user",
       "reset": {

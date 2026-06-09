@@ -8,6 +8,28 @@ Versions are tagged against the upstream commit the fork is based on.
 
 ---
 
+## [Unreleased] — feature/naive-proxy
+
+### Added
+
+#### Per-user IP limit with nftables enforcement
+
+- New `ipLimit` field on naive servers — the max distinct client IPs allowed
+  **per user** (primary + each extra user); 0 = unlimited.
+- When set, the generated Caddyfile writes a per-site JSON access log
+  (`client_ip` + `user_id` per CONNECT); a new naive IP job (every 20 s)
+  reads it and bans excess IPs in the kernel via an `inet 3xui_naive_ban`
+  nftables table — separate from the traffic-counter table so the two don't
+  clobber each other.
+- Bans carry a timeout and are re-observed each run, so an IP that stops
+  exceeding the limit is unbanned automatically — no permanent-ban loops, no
+  unban bookkeeping. IPv4 and IPv6 both supported.
+- **Linux + root only** (needs `nft`); a graceful no-op elsewhere. The access
+  log is only written when a limit is set, so there's no overhead otherwise.
+- IP-limit field added to the add/edit form (en/ru).
+
+---
+
 ## [0.4.0] — 2026-06-08
 
 ### Added

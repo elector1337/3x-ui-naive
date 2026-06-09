@@ -249,10 +249,48 @@ func (s *NaiveService) syncTrafficCounters() {
 		if err := teardownNftCounters(); err != nil {
 			logger.Warningf("naive traffic: teardown counters: %v", err)
 		}
+		if err := syncNaiveBanTable(nil); err != nil {
+			logger.Warningf("naive ipban: teardown: %v", err)
+		}
 		return
 	}
 	if err := rebuildNftCounters(rows); err != nil {
 		logger.Warningf("naive traffic: rebuild counters: %v", err)
+	}
+	// Rebuild the IP-ban structure (chains/sets/rules) for servers with a
+	// limit. Active ban elements are re-added by EnforceIPLimits each cycle.
+	if err := syncNaiveBanTable(rows); err != nil {
+		logger.Warningf("naive ipban: sync table: %v", err)
+	}
+}
+
+// EnforceIPLimits reads each IP-limited server's access log and bans any IP a
+// user has beyond its cap, via nftables (with a timeout, so it self-heals).
+// Called periodically by the naive IP job. No-op when nft is unavailable or no
+// server has a limit.
+func (s *NaiveService) EnforceIPLimits() {
+	rows, err := s.List()
+	if err != nil {
+		logger.Warningf("naive ipban: list: %v", err)
+		return
+	}
+	for _, srv := range rows {
+		if srv.IPLimit <= 0 || srv.UseRawConfig {
+			continue
+		}
+		data, err := tailLogFileBytes(naiveAccessLogPath(srv.Id), 512*1024)
+		if err != nil || len(data) == 0 {
+			continue
+		}
+		excess := naiveExcessIPs(parseNaiveAccessIPs(data), srv.IPLimit)
+		if len(excess) == 0 {
+			continue
+		}
+		if err := banNaiveIPs(srv.Id, excess); err != nil {
+			logger.Warningf("naive ipban: ban %d: %v", srv.Id, err)
+		} else {
+			logger.Infof("naive ipban: server %d banned %d excess IP(s)", srv.Id, len(excess))
+		}
 	}
 }
 
@@ -586,6 +624,32 @@ func tailLogFile(path string, n int) (string, error) {
 	return strings.Join(lines, "\n"), nil
 }
 
+// tailLogFileBytes returns the last maxBytes of a file (or all of it if
+// smaller). A missing file yields (nil, nil). Used by the IP job to scan the
+// recent access log cheaply.
+func tailLogFileBytes(path string, maxBytes int64) ([]byte, error) {
+	f, err := os.Open(path)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return nil, nil
+		}
+		return nil, err
+	}
+	defer f.Close()
+	info, err := f.Stat()
+	if err != nil {
+		return nil, err
+	}
+	var start int64
+	if info.Size() > maxBytes {
+		start = info.Size() - maxBytes
+	}
+	if _, err := f.Seek(start, io.SeekStart); err != nil {
+		return nil, err
+	}
+	return io.ReadAll(f)
+}
+
 func (s *NaiveService) Restore() {
 	rows, err := s.List()
 	if err != nil {
@@ -776,6 +840,13 @@ func renderNaiveCaddyfile(srv *model.NaiveServer) string {
 	} else {
 		fmt.Fprintf(&b, "\ttls %s %s\n", srv.CertFile, srv.KeyFile)
 	}
+	// Per-site JSON access log — only when IP limiting is on. It records
+	// client_ip + user_id per CONNECT, which the naive IP job reads to enforce
+	// the per-user IP cap. Access logs use their own INFO-level logger,
+	// independent of the global level above.
+	if srv.IPLimit > 0 {
+		fmt.Fprintf(&b, "\tlog {\n\t\toutput file %s\n\t\tformat json\n\t}\n", naiveAccessLogPath(srv.Id))
+	}
 	b.WriteString("\troute {\n")
 	b.WriteString("\t\tforward_proxy {\n")
 	fmt.Fprintf(&b, "\t\t\tbasic_auth %s %s\n", srv.AuthUser, srv.AuthPass)
@@ -846,4 +917,10 @@ func resolveNaiveBinary() (string, error) {
 func ensureNaiveDir() (string, error) {
 	dir := filepath.Join(config.GetBinFolderPath(), "naive")
 	return dir, os.MkdirAll(dir, 0o700)
+}
+
+// naiveAccessLogPath is the per-server JSON access log Caddy writes when IP
+// limiting is enabled (and that the naive IP job reads).
+func naiveAccessLogPath(id int) string {
+	return filepath.Join(config.GetBinFolderPath(), "naive", fmt.Sprintf("naive-%d-access.log", id))
 }

@@ -29,6 +29,7 @@ function blank() {
     keyFile: '',
     authUser: '',
     authPass: '',
+    ipLimit: 0,
     padding: true,
     enableH3: true,
     logLevel: 'WARN',
@@ -232,14 +233,20 @@ async function save() {
       </a-row>
 
       <a-row :gutter="12">
-        <a-col :span="12">
+        <a-col :span="9">
           <a-form-item :label="t('pages.naive.fields.authUser')" required>
             <a-input v-model:value="form.authUser" />
           </a-form-item>
         </a-col>
-        <a-col :span="12">
+        <a-col :span="9">
           <a-form-item :label="t('pages.naive.fields.authPass')" required>
             <a-input-password v-model:value="form.authPass" />
+          </a-form-item>
+        </a-col>
+        <a-col :span="6">
+          <a-form-item :label="t('pages.naive.fields.ipLimit')" :help="t('pages.naive.ipLimitHint')">
+            <a-input-number v-model:value="form.ipLimit" :min="0" style="width: 100%"
+              :placeholder="t('pages.naive.unlimited')" />
           </a-form-item>
         </a-col>
       </a-row>
