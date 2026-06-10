@@ -774,6 +774,38 @@ func (t *Tgbot) answerCallback(callbackQuery *telego.CallbackQuery, isAdmin bool
 		if len(dataArray) >= 2 && len(dataArray[1]) > 0 {
 			email := dataArray[1]
 			switch dataArray[0] {
+			case "naive_manage", "naive_start", "naive_stop", "naive_restart":
+				id, err := strconv.Atoi(dataArray[1])
+				if err != nil {
+					t.sendCallbackAnswerTgBot(callbackQuery.ID, err.Error())
+					return
+				}
+				switch dataArray[0] {
+				case "naive_start":
+					if err := t.naiveService.Start(id); err != nil {
+						t.sendCallbackAnswerTgBot(callbackQuery.ID, err.Error())
+					} else {
+						t.sendCallbackAnswerTgBot(callbackQuery.ID, t.I18nBot("tgbot.answers.successfulOperation"))
+					}
+				case "naive_stop":
+					if err := t.naiveService.Stop(id); err != nil {
+						t.sendCallbackAnswerTgBot(callbackQuery.ID, err.Error())
+					} else {
+						t.sendCallbackAnswerTgBot(callbackQuery.ID, t.I18nBot("tgbot.answers.successfulOperation"))
+					}
+				case "naive_restart":
+					if err := t.naiveService.Restart(id); err != nil {
+						t.sendCallbackAnswerTgBot(callbackQuery.ID, err.Error())
+					} else {
+						t.sendCallbackAnswerTgBot(callbackQuery.ID, t.I18nBot("tgbot.answers.successfulOperation"))
+					}
+				default:
+					t.sendCallbackAnswerTgBot(callbackQuery.ID, t.I18nBot("tgbot.buttons.getNaive"))
+				}
+				// Probe needs a moment to reflect the new process state.
+				time.Sleep(300 * time.Millisecond)
+				t.editMessageTgBot(chatId, callbackQuery.Message.GetMessageID(), t.naiveManageText(id), t.getNaiveManageKeyboard(id))
+				return
 			case "get_clients_for_sub":
 				inboundId := dataArray[1]
 				inboundIdInt, err := strconv.Atoi(inboundId)
@@ -1660,9 +1692,12 @@ func (t *Tgbot) answerCallback(callbackQuery *telego.CallbackQuery, isAdmin bool
 		t.sendCallbackAnswerTgBot(callbackQuery.ID, t.I18nBot("tgbot.buttons.getNaive"))
 		msg := t.getNaiveUsages()
 		if msg == "" {
-			msg = t.I18nBot("tgbot.answers.noNaive")
+			t.SendMsgToTgbot(chatId, t.I18nBot("tgbot.answers.noNaive"))
+		} else if kb, err := t.getNaiveServersKeyboard(); err == nil {
+			t.SendMsgToTgbot(chatId, msg, kb)
+		} else {
+			t.SendMsgToTgbot(chatId, msg)
 		}
-		t.SendMsgToTgbot(chatId, msg)
 	case "deplete_soon":
 		t.sendCallbackAnswerTgBot(callbackQuery.ID, t.I18nBot("tgbot.buttons.depleteSoon"))
 		t.getExhausted(chatId)
@@ -2905,6 +2940,66 @@ func (t *Tgbot) getNaiveUsages() string {
 		info.WriteString("\r\n")
 	}
 	return info.String()
+}
+
+// getNaiveServersKeyboard builds a keyboard with one button per naive server
+// (remark + running/stopped icon) that opens its management menu.
+func (t *Tgbot) getNaiveServersKeyboard() (*telego.InlineKeyboardMarkup, error) {
+	servers, err := t.naiveService.List()
+	if err != nil {
+		logger.Warning("naive List for tgbot keyboard failed:", err)
+		return nil, errors.New(t.I18nBot("tgbot.answers.getNaiveFailed"))
+	}
+	if len(servers) == 0 {
+		return nil, errors.New(t.I18nBot("tgbot.answers.noNaive"))
+	}
+	var buttons []telego.InlineKeyboardButton
+	for _, srv := range servers {
+		icon := "🔴"
+		if t.naiveService.Status(srv.Id).Running {
+			icon = "🟢"
+		}
+		label := fmt.Sprintf("%s %s", icon, firstNonEmpty(srv.Remark, fmt.Sprintf("naive-%d", srv.Id)))
+		buttons = append(buttons, tu.InlineKeyboardButton(label).WithCallbackData(t.encodeQuery(fmt.Sprintf("naive_manage %d", srv.Id))))
+	}
+	cols := 1
+	if len(buttons) >= 6 {
+		cols = 2
+	}
+	return tu.InlineKeyboardGrid(tu.InlineKeyboardCols(cols, buttons...)), nil
+}
+
+// getNaiveManageKeyboard builds the start/stop/restart menu for one server.
+func (t *Tgbot) getNaiveManageKeyboard(id int) *telego.InlineKeyboardMarkup {
+	running := t.naiveService.Status(id).Running
+	var firstRow []telego.InlineKeyboardButton
+	if running {
+		firstRow = append(firstRow, tu.InlineKeyboardButton(t.I18nBot("tgbot.buttons.naiveStop")).WithCallbackData(t.encodeQuery(fmt.Sprintf("naive_stop %d", id))))
+	} else {
+		firstRow = append(firstRow, tu.InlineKeyboardButton(t.I18nBot("tgbot.buttons.naiveStart")).WithCallbackData(t.encodeQuery(fmt.Sprintf("naive_start %d", id))))
+	}
+	firstRow = append(firstRow, tu.InlineKeyboardButton(t.I18nBot("tgbot.buttons.naiveRestart")).WithCallbackData(t.encodeQuery(fmt.Sprintf("naive_restart %d", id))))
+	return tu.InlineKeyboard(
+		tu.InlineKeyboardRow(firstRow...),
+		tu.InlineKeyboardRow(tu.InlineKeyboardButton(t.I18nBot("tgbot.buttons.getNaive")).WithCallbackData(t.encodeQuery("naive"))),
+	)
+}
+
+// naiveManageText renders a one-server status line for the management menu.
+func (t *Tgbot) naiveManageText(id int) string {
+	srv, err := t.naiveService.Get(id)
+	if err != nil {
+		return t.I18nBot("tgbot.answers.getNaiveFailed")
+	}
+	state := t.I18nBot("tgbot.messages.naiveStopped")
+	if t.naiveService.Status(srv.Id).Running {
+		state = t.I18nBot("tgbot.messages.naiveRunning")
+	}
+	var b strings.Builder
+	b.WriteString(t.I18nBot("tgbot.messages.naiveServer", "Remark=="+firstNonEmpty(srv.Remark, fmt.Sprintf("naive-%d", srv.Id)), "State=="+state))
+	b.WriteString(t.I18nBot("tgbot.messages.port", "Port=="+strconv.Itoa(srv.Port)))
+	b.WriteString(t.I18nBot("tgbot.messages.traffic", "Total=="+common.FormatTraffic(srv.Up+srv.Down), "Upload=="+common.FormatTraffic(srv.Up), "Download=="+common.FormatTraffic(srv.Down)))
+	return b.String()
 }
 
 // getInbounds creates an inline keyboard with all inbounds.

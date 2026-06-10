@@ -12,6 +12,15 @@ Versions are tagged against the upstream commit the fork is based on.
 
 ### Added
 
+#### Naive start/stop/restart from the Telegram bot
+
+- The **Get Naive** report is now interactive: each server is a button that
+  opens a management menu with **Start / Stop / Restart** (and back), updated
+  in place after each action — mirroring the inbound-client drilldown.
+- New `naive_manage` / `naive_start` / `naive_stop` / `naive_restart`
+  callbacks; start/stop button swaps to match the live running state.
+- en/ru button strings; other locales fall back to English.
+
 #### Per-user IP limit with nftables enforcement
 
 - New `ipLimit` field on naive servers — the max distinct client IPs allowed

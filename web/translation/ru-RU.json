@@ -1060,7 +1060,10 @@
       "change_flow": "⚙️🚦 Поток",
       "ResetAllTraffics": "Сбросить весь трафик",
       "SortedTrafficUsageReport": "Отсортированный отчет об использовании трафика",
-      "getNaive": "Naive-серверы"
+      "getNaive": "Naive-серверы",
+      "naiveStart": "▶️ Запустить",
+      "naiveStop": "⏹ Остановить",
+      "naiveRestart": "🔄 Перезапустить"
     },
     "answers": {
       "successfulOperation": "✅ Успешно!",

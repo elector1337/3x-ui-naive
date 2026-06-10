@@ -1060,7 +1060,10 @@
       "change_flow": "⚙️🚦 Flow",
       "ResetAllTraffics": "Reset All Traffic",
       "SortedTrafficUsageReport": "Sorted Traffic Usage Report",
-      "getNaive": "Get Naive"
+      "getNaive": "Get Naive",
+      "naiveStart": "▶️ Start",
+      "naiveStop": "⏹ Stop",
+      "naiveRestart": "🔄 Restart"
     },
     "answers": {
       "successfulOperation": "✅ Operation successful!",
