@@ -141,7 +141,7 @@ sudo setcap cap_net_bind_service=+ep <путь_к_caddy>
 | POST  | `/add`                | создать; делает кросс-проверку портов; если `enable=true` — стартует       |
 | POST  | `/update/:id`         | обновить; рестартует, если процесс был запущен                             |
 | POST  | `/delete/:id`         | остановить и удалить                                                       |
-| GET   | `/status/:id`         | `{ running, listening, pid, since, logPath }`                              |
+| GET   | `/status/:id`         | `{ running, listening, responding, pid, since, logPath }`                  |
 | POST  | `/start/:id`          | запустить процесс                                                          |
 | POST  | `/stop/:id`           | SIGTERM (SIGKILL fallback)                                                 |
 | POST  | `/restart/:id`        | stop, 200ms, start                                                         |
@@ -155,11 +155,15 @@ sudo setcap cap_net_bind_service=+ep <путь_к_caddy>
 - `running: true` — процесс жив (kill -0 успешен)
 - `listening: true` — поверх `running`: TCP-probe `127.0.0.1:port` ответил
   (значит naive реально открыл сокет, не висит в init)
+- `responding: true` — поверх `listening`: HTTPS-проба (HEAD на
+  `127.0.0.1:port`, 1 с, `InsecureSkipVerify`) завершилась — TLS-рукопожатие
+  прошло, значит Caddy действительно обслуживает, а не просто держит сокет
 
 В UI:
 
-- зелёный «Running» — running ∧ listening
-- синий «Starting…» — running ∧ ¬listening (только запустили или зависли)
+- зелёный «Running» — running ∧ listening ∧ responding
+- жёлтый «Unresponsive» — running ∧ listening, но TLS не отвечает (завис)
+- синий «Starting…» — running, порт ещё не открыт
 - серый «Stopped» — процесс отсутствует
 
 ## Кросс-проверка портов
@@ -226,7 +230,9 @@ USER/PASS URL-encoded.
 
 - xcaddy-инсталлер требует **Go 1.22+** на хосте; на голом сервере без Go
   баннер покажет ссылку на go.dev/dl
-- TCP-probe в статусе проверяет только локальный сокет, не HTTP-ответ
+- проба статуса локальная (`127.0.0.1`): `listening` — TCP-сокет открыт,
+  `responding` — TLS-рукопожатие прошло; полноценный HTTP-ответ
+  forward_proxy не запрашивается
 - traffic stats считаются из ядра (nftables-счётчики на порт) — **только
   Linux + root**; на других платформах / без root / без `nft` колонка
   трафика остаётся в нуле (Caddy сам байты туннелей не отдаёт)
