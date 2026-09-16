@@ -8,7 +8,7 @@ Versions are tagged against the upstream commit the fork is based on.
 
 ---
 
-## [Unreleased] — feature/naive-proxy
+## [0.5.0] — 2026-09-16
 
 ### Changed
 
