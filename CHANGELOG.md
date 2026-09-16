@@ -10,6 +10,33 @@ Versions are tagged against the upstream commit the fork is based on.
 
 ## [Unreleased] — feature/naive-proxy
 
+### Changed
+
+#### Rebased onto upstream v3.8.5
+
+- The fork now tracks upstream **v3.8.5** (previously v3.0.2 + 22 commits).
+  Go code moved under `internal/` following upstream's restructure; the Go
+  toolchain requirement is now **1.27**.
+- The naive UI page was rewritten from Vue to **React + TypeScript + Ant
+  Design 6** to match upstream's new frontend, and is registered as a route
+  of the panel SPA (`/panel/naive`) instead of a standalone Vite entry.
+- Naive servers plug into upstream's reworked subsystems: the structured port
+  conflict detector, the split Telegram bot package, the SQLite→PostgreSQL
+  data migration (naive tables are copied too) and the API docs registry.
+- Naive translation keys were added to every locale (English text where no
+  translation exists yet), as upstream now requires identical key sets.
+- Where the fork's code lives now:
+
+  ```
+  internal/database/model/naive.go
+  internal/util/crypto/crypto.go              # AES-256-GCM helpers
+  internal/web/controller/naive.go
+  internal/web/job/naive_*.go
+  internal/web/service/naive*.go
+  internal/web/service/tgbot/tgbot_naive.go
+  frontend/src/pages/naive/                   # NaivePage, NaiveFormModal, useNaive
+  ```
+
 ### Added
 
 #### Naive start/stop/restart from the Telegram bot

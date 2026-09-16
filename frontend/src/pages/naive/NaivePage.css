@@ -1,0 +1,101 @@
+.naive-page .list-card code {
+  font-size: 12px;
+}
+
+.naive-install-log {
+  max-height: 240px;
+  overflow: auto;
+  font-size: 11px;
+  white-space: pre-wrap;
+  margin: 0;
+}
+
+.naive-mobile-cards {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.naive-srv-card {
+  border: 1px solid var(--ant-color-border-secondary);
+  border-radius: 6px;
+  padding: 10px 12px;
+  background: var(--bg-card);
+}
+
+.naive-srv-head {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-bottom: 6px;
+}
+
+.naive-srv-title {
+  font-weight: 600;
+  font-size: 14px;
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.naive-srv-row {
+  display: flex;
+  justify-content: space-between;
+  font-size: 12px;
+  padding: 2px 0;
+  gap: 12px;
+}
+
+.naive-srv-row code {
+  font-size: 12px;
+  color: inherit;
+}
+
+.naive-srv-label {
+  opacity: 0.65;
+}
+
+.naive-srv-actions {
+  margin-top: 8px;
+}
+
+.naive-log-view {
+  max-height: 480px;
+  overflow: auto;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 12px;
+  line-height: 1.4;
+  background: var(--ant-color-fill-tertiary);
+  padding: 10px 12px;
+  border-radius: 4px;
+  margin: 0;
+  white-space: pre-wrap;
+  word-break: break-all;
+}
+
+.naive-log-hint {
+  font-size: 11px;
+  opacity: 0.6;
+}
+
+.naive-raw-editor textarea,
+textarea.naive-raw-editor {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 12px;
+  tab-size: 4;
+}
+
+.naive-users {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.naive-user-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
