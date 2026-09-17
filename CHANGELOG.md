@@ -8,6 +8,33 @@ Versions are tagged against the upstream commit the fork is based on.
 
 ---
 
+## [Unreleased] — feature/naive-proxy
+
+### Added
+
+#### Naive servers in the JSON and Clash subscription formats
+
+- A naive server tagged with a `subId` now appears in **all three** subscription
+  outputs, not only the plain base64 one. Upstream picks the format from the
+  client's User-Agent, so a modern client asking for `/json` or `/clash` no
+  longer receives a subscription without the naive entries.
+- A naive server is Caddy's `forward_proxy` — an HTTPS proxy with basic auth —
+  so no naive-specific type is needed: Clash gets an `http` proxy with
+  `tls: true` and the domain as SNI, and the JSON output gets an Xray `http`
+  outbound over a TLS stream.
+- Legacy Clash output still drops them: that core has no HTTPS-proxy type.
+- A subscription carrying only naive servers now renders in these formats
+  instead of returning empty.
+
+### Fixed
+
+- `install.sh` rejected every release of this fork when a specific version was
+  requested (`install.sh v0.5.0`), because the minimum-version floor was
+  inherited from upstream (v2.3.5). The floor is now the fork's first release,
+  a malformed tag gets a clear error, and `0.5.0` is normalized to `v0.5.0`.
+
+---
+
 ## [0.5.0] — 2026-09-16
 
 ### Changed

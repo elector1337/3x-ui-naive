@@ -83,12 +83,23 @@ func naiveClientURL(domain string, port int, user, pass, remark string) string {
 	return link
 }
 
-// SubLinks returns the naive client URLs that belong to subscription subId:
+// NaiveSubCredential is one shareable naive credential resolved for a
+// subscription: the server endpoint plus the user it belongs to. The
+// subscription layer renders it as a link, a Clash proxy or an Xray outbound.
+type NaiveSubCredential struct {
+	Remark   string
+	Domain   string
+	Port     int
+	Username string
+	Password string
+}
+
+// SubCredentials returns the credentials that belong to subscription subId:
 // for every enabled server tagged with that SubId, the primary credential plus
 // each enabled extra user. Raw-config servers are skipped (the panel doesn't
 // know their domain/port/credentials). Returns nil when subId is empty or
-// nothing matches — callers append the result to the subscription output.
-func (s *NaiveService) SubLinks(subId string) []string {
+// nothing matches.
+func (s *NaiveService) SubCredentials(subId string) []NaiveSubCredential {
 	if strings.TrimSpace(subId) == "" {
 		return nil
 	}
@@ -99,18 +110,44 @@ func (s *NaiveService) SubLinks(subId string) []string {
 		logger.Warningf("naive sub: query %q: %v", subId, err)
 		return nil
 	}
-	var links []string
+	var creds []NaiveSubCredential
 	for _, srv := range rows {
 		if srv.Domain == "" || srv.Port <= 0 {
 			continue
 		}
 		base := firstNonEmpty(srv.Remark, srv.Domain)
-		links = append(links, naiveClientURL(srv.Domain, srv.Port, srv.AuthUser, srv.AuthPass, base))
+		creds = append(creds, NaiveSubCredential{
+			Remark:   base,
+			Domain:   srv.Domain,
+			Port:     srv.Port,
+			Username: srv.AuthUser,
+			Password: srv.AuthPass,
+		})
 		for _, u := range srv.Users {
 			if u != nil && u.Enable && strings.TrimSpace(u.Username) != "" {
-				links = append(links, naiveClientURL(srv.Domain, srv.Port, u.Username, u.Password, base+"-"+u.Username))
+				creds = append(creds, NaiveSubCredential{
+					Remark:   base + "-" + u.Username,
+					Domain:   srv.Domain,
+					Port:     srv.Port,
+					Username: u.Username,
+					Password: u.Password,
+				})
 			}
 		}
+	}
+	return creds
+}
+
+// SubLinks renders SubCredentials as naive+https:// client URLs, the form the
+// plain (base64) subscription output uses.
+func (s *NaiveService) SubLinks(subId string) []string {
+	creds := s.SubCredentials(subId)
+	if len(creds) == 0 {
+		return nil
+	}
+	links := make([]string, 0, len(creds))
+	for _, c := range creds {
+		links = append(links, naiveClientURL(c.Domain, c.Port, c.Username, c.Password, c.Remark))
 	}
 	return links
 }

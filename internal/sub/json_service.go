@@ -125,7 +125,8 @@ func (s *SubJsonService) GetJson(subId string, host string, alwaysReturnArray bo
 	if err != nil {
 		return "", "", err
 	}
-	if len(inbounds) == 0 && len(externalLinks) == 0 {
+	naiveCreds := subReq.naiveCredentials(subId)
+	if len(inbounds) == 0 && len(externalLinks) == 0 && len(naiveCreds) == 0 {
 		return "", "", nil
 	}
 
@@ -207,6 +208,13 @@ func (s *SubJsonService) GetJson(subId string, host string, alwaysReturnArray bo
 			newConfig, _ := json.MarshalIndent(newConfigJson, "", "  ")
 			configArray = append(configArray, newConfig)
 		}
+	}
+
+	// Naive servers are panel-managed HTTPS proxies, not xray inbounds, and
+	// carry no per-client traffic rows — they add configs, not usage figures.
+	for _, cred := range naiveCreds {
+		configArray = append(configArray, s.naiveJSONConfig(cred))
+		hasEnabledClient = true
 	}
 
 	if len(configArray) == 0 && !hasInactiveExternal {

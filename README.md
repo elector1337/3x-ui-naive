@@ -49,7 +49,7 @@ separate child process, with its own config, log and ACME storage.
 - **multiple users per server** — extra `basic_auth` credentials, each with its own client URL and QR
 - **QR code / share-link** generator for every credential
 - **HTTP/3 (QUIC) toggle** per server
-- **subscription integration** — tag a server with a `subId` and its client URLs join that subscription
+- **subscription integration** — tag a server with a `subId` and the server joins that subscription in every format: a `naive+https://` link in the plain output, an `http` proxy with TLS in Clash, and an `http` outbound over TLS in the JSON (Xray) output
 - **Telegram bot report** — naive servers in the admin usage report
 - `authPass` and extra-user passwords **encrypted at rest** (AES-256-GCM)
 

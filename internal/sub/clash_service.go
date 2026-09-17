@@ -48,7 +48,8 @@ func (s *SubClashService) getClash(subId string, host string, legacy bool) (stri
 	if err != nil {
 		return "", "", err
 	}
-	if len(inbounds) == 0 && len(externalLinks) == 0 {
+	naiveCreds := subReq.naiveCredentials(subId)
+	if len(inbounds) == 0 && len(externalLinks) == 0 && len(naiveCreds) == 0 {
 		return "", "", nil
 	}
 
@@ -94,6 +95,13 @@ func (s *SubClashService) getClash(subId string, host string, legacy bool) (stri
 				proxies = append(proxies, proxy)
 			}
 		}
+	}
+
+	// Naive servers are panel-managed HTTPS proxies, not xray inbounds, and
+	// carry no per-client traffic rows — they add proxies, not usage figures.
+	for _, cred := range naiveCreds {
+		proxies = append(proxies, naiveClashProxy(cred))
+		hasEnabledClient = true
 	}
 
 	if len(proxies) == 0 && !hasInactiveExternal {
