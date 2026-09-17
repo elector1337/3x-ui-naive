@@ -1705,13 +1705,21 @@ install_x-ui() {
             tag_version="dev-latest"
             echo -e "${yellow}Installing the rolling dev build (tag: dev-latest). This is a per-commit pre-release, not a stable version.${plain}"
         else
+            # This fork numbers its releases independently of upstream
+            # (v0.1.0, v0.2.0, ...), so the floor is the fork's first release.
             tag_version_numeric=${tag_version#v}
-            min_version="2.3.5"
+            min_version="0.1.0"
 
-            if [[ "$(printf '%s\n' "$min_version" "$tag_version_numeric" | sort -V | head -n1)" != "$min_version" ]]; then
-                echo -e "${red}Please use a newer version (at least v2.3.5). Exiting installation.${plain}"
+            if [[ ! "$tag_version_numeric" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+                echo -e "${red}Invalid version '${tag_version}'. Use a release tag such as v0.5.0 (see https://github.com/${xui_repo}/releases). Exiting installation.${plain}"
                 exit 1
             fi
+            if [[ "$(printf '%s\n' "$min_version" "$tag_version_numeric" | sort -V | head -n1)" != "$min_version" ]]; then
+                echo -e "${red}Please use a newer version (at least v${min_version}). Exiting installation.${plain}"
+                exit 1
+            fi
+            # Release tags carry a leading "v"; accept "0.5.0" as well.
+            tag_version="v${tag_version_numeric}"
         fi
 
         url="https://github.com/${xui_repo}/releases/download/${tag_version}/x-ui-linux-$(arch).tar.gz"

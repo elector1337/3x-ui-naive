@@ -124,10 +124,10 @@ interactive prompt), set `NAIVE_INSTALL_CADDY=yes`:
 NAIVE_INSTALL_CADDY=yes bash <(curl -Ls https://raw.githubusercontent.com/elector1337/3x-ui-naive/feature/naive-proxy/install.sh)
 ```
 
-To install a specific version, append its tag (e.g. `v3.7.0`):
+To install a specific version, append its tag (e.g. `v0.5.0`):
 
 ```bash
-bash <(curl -Ls https://raw.githubusercontent.com/elector1337/3x-ui-naive/feature/naive-proxy/install.sh) v3.7.0
+bash <(curl -Ls https://raw.githubusercontent.com/elector1337/3x-ui-naive/feature/naive-proxy/install.sh) v0.5.0
 ```
 
 To install the rolling **dev** build (latest per-commit pre-release from `main`, not a stable release), pass `dev-latest`:
